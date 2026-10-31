@@ -139,24 +139,74 @@ function getDipGeometry(part) {
   return { startCol, spanCols, xLeft, width, yTop, height };
 }
 
-function computePartBounds(part) {
+function renderPartHalo(
+  part,
+  { className, stroke, strokeWidth = 2, dashArray = '', fill = 'none', extraPad = 0 }
+) {
+  const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : '';
+
+  if (part.type === 'wire') {
+    const p1 = resolvePinCoord(part.from);
+    const p2 = resolvePinCoord(part.to);
+    if (!p1 || !p2) return '';
+    const lineWidth = 10 + extraPad * 2;
+    return `<line class="${className}" pointer-events="none" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" fill="none" stroke="${stroke}" stroke-width="${lineWidth}" stroke-linecap="round" stroke-opacity="0.72"${dashAttr}/>`;
+  }
+
+  if (
+    part.type === 'resistor' ||
+    part.type === 'diode' ||
+    part.type === 'filmcap' ||
+    part.type === 'ecap' ||
+    part.type === 'vactrol_led' ||
+    part.type === 'vactrol_ldr'
+  ) {
+    const p1 = resolvePinCoord(part.from);
+    const p2 = resolvePinCoord(part.to);
+    if (!p1 || !p2) return '';
+    const mx = (p1.x + p2.x) / 2;
+    const my = (p1.y + p2.y) / 2;
+    let angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
+    if (part.type === 'filmcap') {
+      if (angle > 90) angle -= 180;
+      if (angle < -90) angle += 180;
+    }
+
+    const leadWidth = 7.5 + extraPad * 2;
+    let out = `<line class="${className}" pointer-events="none" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" fill="none" stroke="${stroke}" stroke-width="${leadWidth}" stroke-linecap="round" stroke-opacity="0.65"${dashAttr}/>`;
+
+    if (part.type === 'resistor' || part.type === 'diode' || part.type === 'filmcap') {
+      const halfW = (part.type === 'filmcap' ? 23 : part.type === 'resistor' ? 18 : 17) + extraPad;
+      const halfH = (part.type === 'filmcap' ? 12.5 : 9.5) + extraPad;
+      out += `<g transform="translate(${mx},${my}) rotate(${angle.toFixed(2)})" pointer-events="none">`;
+      out += `<rect class="${className}" pointer-events="none" x="${-halfW}" y="${-halfH}" width="${halfW * 2}" height="${halfH * 2}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"${dashAttr}/>`;
+      out += `</g>`;
+      return out;
+    }
+
+    if (part.type === 'ecap' || part.type === 'vactrol_led') {
+      const r = (part.type === 'ecap' ? 16.5 : 15) + extraPad;
+      out += `<circle class="${className}" pointer-events="none" cx="${mx}" cy="${my}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"${dashAttr}/>`;
+      return out;
+    }
+
+    out += `<ellipse class="${className}" pointer-events="none" cx="${mx}" cy="${my}" rx="${20 + extraPad}" ry="${15 + extraPad}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"${dashAttr}/>`;
+    return out;
+  }
+
   if (part.type === 'dipN' || part.type === 'dip8') {
     const dip = getDipGeometry(part);
-    return {
-      x: dip.xLeft - 5,
-      y: dip.yTop - 6,
-      width: dip.width + 10,
-      height: dip.height + 12
-    };
+    const x = dip.xLeft - 5 - extraPad;
+    const y = dip.yTop - 6 - extraPad;
+    const width = dip.width + 10 + extraPad * 2;
+    const height = dip.height + 12 + extraPad * 2;
+    return `<rect class="${className}" pointer-events="none" x="${x}" y="${y}" width="${width}" height="${height}" rx="7" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"${dashAttr}/>`;
   }
 
   const coords = getPartPins(part)
     .map((pin) => resolvePinCoord(pin))
     .filter(Boolean);
-
-  if (coords.length === 0) {
-    return null;
-  }
+  if (coords.length === 0) return '';
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -169,16 +219,12 @@ function computePartBounds(part) {
     if (pt.y > maxY) maxY = pt.y;
   }
 
-  const padX = part.type === 'pot' || part.type === 'transistor' ? 18 : 13;
-  const padTop = part.type === 'pot' || part.type === 'ecap' ? 16 : 12;
-  const padBottom = part.type === 'pot' ? 26 : part.type === 'ecap' ? 16 : 12;
-
-  return {
-    x: minX - padX,
-    y: minY - padTop,
-    width: Math.max(24, maxX - minX + padX * 2),
-    height: Math.max(24, maxY - minY + padTop + padBottom)
-  };
+  const padX = 18 + extraPad;
+  const padTop = (part.type === 'pot' ? 16 : 12) + extraPad;
+  const padBottom = (part.type === 'pot' ? 26 : 12) + extraPad;
+  const width = Math.max(24, maxX - minX + padX * 2);
+  const height = Math.max(24, maxY - minY + padTop + padBottom);
+  return `<rect class="${className}" pointer-events="none" x="${minX - padX}" y="${minY - padTop}" width="${width}" height="${height}" rx="7" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"${dashAttr}/>`;
 }
 
 function shortCapLabel(part) {
@@ -370,7 +416,7 @@ function renderVactrolSleeve(parts) {
   const minY = Math.min(...coords.map((c) => c.y)) - 16;
   const maxY = Math.max(...coords.map((c) => c.y)) + 16;
 
-  return `<rect class="bb-vactrol-sleeve" x="${minX}" y="${minY}" width="${maxX - minX}" height="${maxY - minY}" rx="8" fill="rgba(34,211,238,0.09)" stroke="#22d3ee" stroke-dasharray="4 3" stroke-width="1.6"/>`;
+  return `<rect class="bb-vactrol-sleeve" pointer-events="none" x="${minX}" y="${minY}" width="${maxX - minX}" height="${maxY - minY}" rx="8" fill="rgba(34,211,238,0.09)" stroke="#22d3ee" stroke-dasharray="4 3" stroke-width="1.6"/>`;
 }
 
 export function renderBreadboardSvg({
@@ -422,7 +468,7 @@ export function renderBreadboardSvg({
   for (const [key, hdr] of Object.entries(HDR_PINS)) {
     const isHi = netStrips.has(key);
     if (isHi) {
-      out += `<rect class="bb-net-strip" data-strip="${key}" x="${hdr.boxX - 3}" y="18" width="70" height="36" rx="7" fill="rgba(56,189,248,0.22)" stroke="#38bdf8" stroke-width="1.5"/>`;
+      out += `<rect class="bb-net-strip" pointer-events="none" data-strip="${key}" x="${hdr.boxX - 3}" y="18" width="70" height="36" rx="7" fill="rgba(56,189,248,0.22)" stroke="#38bdf8" stroke-width="1.5"/>`;
     }
     out += `<g class="bb-header-socket" data-pin="${key}">`;
     out += `<rect x="${hdr.boxX}" y="21" width="64" height="30" rx="5" fill="#1e293b" stroke="${isHi ? '#38bdf8' : hdr.color}" stroke-width="${isHi ? 2.4 : 1.5}"/>`;
@@ -451,17 +497,17 @@ export function renderBreadboardSvg({
       const railFill = rail.includes('PLUS')
         ? 'rgba(239,68,68,0.20)'
         : 'rgba(56,189,248,0.22)';
-      out += `<rect class="bb-net-strip" data-strip="${rail}" x="${colX(1) - 10}" y="${ry - 9}" width="${29 * COL_PITCH + 20}" height="18" rx="5" fill="${railFill}" stroke="#38bdf8" stroke-width="1.5"/>`;
+      out += `<rect class="bb-net-strip" pointer-events="none" data-strip="${rail}" x="${colX(1) - 10}" y="${ry - 9}" width="${29 * COL_PITCH + 20}" height="18" rx="5" fill="${railFill}" stroke="#38bdf8" stroke-width="1.5"/>`;
     }
   }
 
   for (let c = 1; c <= 30; c++) {
     const x = colX(c);
     if (netStrips.has(`TOP_ROW_${c}`)) {
-      out += `<rect class="bb-net-strip" data-strip="TOP_ROW_${c}" x="${x - 9}" y="${Y_MAP.A - 9}" width="18" height="${Y_MAP.E - Y_MAP.A + 18}" rx="5" fill="rgba(56,189,248,0.22)" stroke="#38bdf8" stroke-width="1.5"/>`;
+      out += `<rect class="bb-net-strip" pointer-events="none" data-strip="TOP_ROW_${c}" x="${x - 9}" y="${Y_MAP.A - 9}" width="18" height="${Y_MAP.E - Y_MAP.A + 18}" rx="5" fill="rgba(56,189,248,0.22)" stroke="#38bdf8" stroke-width="1.5"/>`;
     }
     if (netStrips.has(`BOT_ROW_${c}`)) {
-      out += `<rect class="bb-net-strip" data-strip="BOT_ROW_${c}" x="${x - 9}" y="${Y_MAP.F - 9}" width="18" height="${Y_MAP.J - Y_MAP.F + 18}" rx="5" fill="rgba(56,189,248,0.22)" stroke="#38bdf8" stroke-width="1.5"/>`;
+      out += `<rect class="bb-net-strip" pointer-events="none" data-strip="BOT_ROW_${c}" x="${x - 9}" y="${Y_MAP.F - 9}" width="18" height="${Y_MAP.J - Y_MAP.F + 18}" rx="5" fill="rgba(56,189,248,0.22)" stroke="#38bdf8" stroke-width="1.5"/>`;
     }
   }
 
@@ -536,14 +582,32 @@ export function renderBreadboardSvg({
     const checkedAttr = isChecked ? ' data-checked="true"' : '';
     out += `<g class="${classes.join(' ')}" data-part-id="${escapeXml(part.id)}" data-diff-status="${escapeXml(diffStatus)}"${opacityAttr}${checkedAttr}>`;
 
-    const bounds = computePartBounds(part);
-    if (bounds && diffActive && diffStatus === 'added') {
-      out += `<rect class="bb-diff-halo" x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" rx="7" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="2"/>`;
-    } else if (bounds && diffActive && diffStatus === 'modified') {
-      out += `<rect class="bb-diff-halo" x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" rx="7" fill="rgba(245,158,11,0.12)" stroke="#f59e0b" stroke-dasharray="5 3" stroke-width="2"/>`;
+    if (diffActive && diffStatus === 'added') {
+      out += renderPartHalo(part, {
+        className: 'bb-diff-halo',
+        stroke: '#10b981',
+        strokeWidth: 2,
+        fill: 'rgba(16,185,129,0.12)',
+        extraPad: 0
+      });
+    } else if (diffActive && diffStatus === 'modified') {
+      out += renderPartHalo(part, {
+        className: 'bb-diff-halo',
+        stroke: '#f59e0b',
+        strokeWidth: 2,
+        dashArray: '5 3',
+        fill: 'rgba(245,158,11,0.12)',
+        extraPad: 0
+      });
     }
-    if (bounds && isSelected) {
-      out += `<rect class="bb-selected-halo" x="${bounds.x - 2}" y="${bounds.y - 2}" width="${bounds.width + 4}" height="${bounds.height + 4}" rx="8" fill="none" stroke="#38bdf8" stroke-width="2.2"/>`;
+    if (isSelected) {
+      out += renderPartHalo(part, {
+        className: 'bb-selected-halo',
+        stroke: '#38bdf8',
+        strokeWidth: 2.2,
+        fill: 'none',
+        extraPad: 2.5
+      });
     }
 
     out += renderPartBody(part, palette);

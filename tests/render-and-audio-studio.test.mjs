@@ -101,6 +101,82 @@ test('renderBreadboardSvg renders all 7 stages across presets/modes, enforces >=
   assert.match(s5bDiffSvg, /#f59e0b/);
 });
 
+test('diagonal wire and 2-pin halos follow lead segments without oversized rects and set pointer-events="none" on overlays', () => {
+  const s3Transition = getDiffAgainstPrevious('3');
+  const s3Parts = getStageParts('3');
+  const s3Svg = renderBreadboardSvg({
+    preset: ORDERED_STAGES[2].presets[ORDERED_STAGES[2].defaultPresetId],
+    parts: s3Parts,
+    selectedPartId: 'J_CG_VREF',
+    diffResult: s3Transition.diff,
+    diffEnabled: true,
+    highlightedNet: traceConnectedNet(s3Parts, 'HDR_GND')
+  });
+
+  const extractPartGroup = (svg, partId) => {
+    const re = new RegExp(`<g class="bb-part[^"]*" data-part-id="${partId}"[^>]*>([\\s\\S]*?)</g>`);
+    const match = svg.match(re);
+    assert.ok(match, `expected group for ${partId}`);
+    return match[1];
+  };
+
+  const jCgGroup = extractPartGroup(s3Svg, 'J_CG_VREF');
+  assert.doesNotMatch(jCgGroup, /<rect\b/, 'wire jumper J_CG_VREF must not emit axis-aligned rect halos');
+  assert.match(jCgGroup, /<line[^>]*class="bb-diff-halo"[^>]*pointer-events="none"/);
+  assert.match(jCgGroup, /<line[^>]*class="bb-selected-halo"[^>]*pointer-events="none"/);
+  assert.match(jCgGroup, /#10b981/);
+  assert.match(jCgGroup, /#38bdf8/);
+
+  const s5bTransition = getDiffAgainstPrevious('5b');
+  const s5bParts = getStageParts('5b');
+  const s5bSvg = renderBreadboardSvg({
+    preset: ORDERED_STAGES[5].presets[ORDERED_STAGES[5].defaultPresetId],
+    parts: s5bParts,
+    selectedPartId: 'J_LED_VREF',
+    diffResult: s5bTransition.diff,
+    diffEnabled: true,
+    highlightedNet: traceConnectedNet(s5bParts, 'HDR_GND')
+  });
+
+  const jLedGroup = extractPartGroup(s5bSvg, 'J_LED_VREF');
+  assert.doesNotMatch(jLedGroup, /<rect\b/, 'diagonal wire J_LED_VREF must not emit board-covering rect halos');
+  assert.match(jLedGroup, /<line[^>]*class="bb-diff-halo"[^>]*pointer-events="none"/);
+  assert.match(jLedGroup, /<line[^>]*class="bb-selected-halo"[^>]*pointer-events="none"/);
+
+  const vacLdrGroup = extractPartGroup(s5bSvg, 'VAC_LDR');
+  assert.doesNotMatch(vacLdrGroup, /<rect\b/, 'diagonal 2-pin VAC_LDR must use segment + local body halos');
+  assert.match(vacLdrGroup, /<line[^>]*class="bb-diff-halo"[^>]*pointer-events="none"/);
+  assert.match(vacLdrGroup, /<ellipse[^>]*class="bb-diff-halo"[^>]*pointer-events="none"/);
+  assert.match(vacLdrGroup, /#f59e0b/);
+
+  for (const overlayTag of s5bSvg.matchAll(/<[a-z]+\b[^>]*class="bb-(?:diff-halo|selected-halo|net-strip|vactrol-sleeve)"[^>]*>/g)) {
+    assert.match(
+      overlayTag[0],
+      /pointer-events="none"/,
+      `overlay element must disable pointer events: ${overlayTag[0]}`
+    );
+  }
+
+  for (const stage of ORDERED_STAGES.slice(1)) {
+    const tr = getDiffAgainstPrevious(stage.slug);
+    const parts = getStageParts(stage.slug);
+    const svg = renderBreadboardSvg({
+      preset: stage.presets[stage.defaultPresetId],
+      parts,
+      selectedPartId: parts[parts.length - 1].id,
+      diffResult: tr.diff,
+      diffEnabled: true
+    });
+    for (const rectMatch of svg.matchAll(/<rect\b[^>]*class="bb-(?:diff|selected)-halo"[^>]*>/g)) {
+      const wMatch = rectMatch[0].match(/\bwidth="([0-9.]+)"/);
+      const hMatch = rectMatch[0].match(/\bheight="([0-9.]+)"/);
+      assert.ok(wMatch && hMatch);
+      assert.equal(Number(wMatch[1]) <= 270, true, `Stage ${stage.slug} halo rect too wide: ${rectMatch[0]}`);
+      assert.equal(Number(hMatch[1]) <= 95, true, `Stage ${stage.slug} halo rect too tall: ${rectMatch[0]}`);
+    }
+  }
+});
+
 test('bindBreadboardInteractions delegates click, mouseover, and mouseleave for parts and pins', () => {
   const listeners = new Map();
   const container = {
