@@ -76,7 +76,11 @@ function withPartMeta(part) {
 
 function buildComponents(presetInput) {
   const preset =
-    (typeof presetInput === 'string' ? PRESETS[presetInput] : presetInput) || PRESETS.svt_warm;
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.svt_warm;
 
   const parts = [
     {
@@ -336,7 +340,7 @@ function buildComponents(presetInput) {
       value: '220nF Film',
       from: 'E6',
       to: 'E4',
-      color: '#a855f7',
+      color: '#38bdf8',
       net: 'Drive Coupling',
       notes: 'Exact 2-row box cap coupling buffered bass out of Q1 Emitter into Row 4 Top.'
     },
@@ -369,10 +373,10 @@ function buildComponents(presetInput) {
       stage: 3,
       type: 'wire',
       name: 'Gate 1 FB Out',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'H11',
       to: 'D19',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'Gate 1 Out (Pin 2)',
       notes: 'Routes Gate 1 Output (probe at J11) to DRIVE Lug 3 (Row 19 Top).'
     },
@@ -413,7 +417,7 @@ function buildComponents(presetInput) {
         value: '220nF Film',
         from: 'I11',
         to: 'I9',
-        color: '#a855f7',
+        color: '#38bdf8',
         net: 'Stage 1-to-2 Link',
         notes: 'Couples Gate 1 Output into Row 9 Bottom.'
       },
@@ -444,10 +448,10 @@ function buildComponents(presetInput) {
         stage: 3,
         type: 'wire',
         name: 'Gate 2 Out Spur',
-        value: 'Purple Jumper',
+        value: 'Teal Jumper',
         from: 'I13',
         to: 'F20',
-        color: '#a855f7',
+        color: '#14b8a6',
         net: 'Gate 2 Output (Pin 4)',
         notes:
           'Routes Gate 2 Output (Row 13) to Row 20 Bottom so C4 sits at exact 2-row box-cap spacing.'
@@ -484,10 +488,10 @@ function buildComponents(presetInput) {
         stage: 3,
         type: 'wire',
         name: 'Gate 1 Out Spur',
-        value: 'Purple Jumper',
+        value: 'Teal Jumper',
         from: 'I11',
         to: 'F20',
-        color: '#a855f7',
+        color: '#14b8a6',
         net: 'Gate 1 Output (Pin 2)',
         notes:
           'Routes Gate 1 Output (Row 11) to Row 20 Bottom so C4 sits at exact 2-row box-cap spacing.'
@@ -637,7 +641,7 @@ function buildComponents(presetInput) {
       value: '4.7nF Film',
       from: 'A22',
       to: 'A20',
-      color: '#a855f7',
+      color: '#38bdf8',
       net: '2.2 kHz High-Shelf',
       notes: 'Passes only >2.2 kHz treble energy into Gate 3 summing node.'
     },

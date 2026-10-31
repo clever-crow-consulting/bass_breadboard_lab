@@ -76,7 +76,11 @@ function withPartMeta(part) {
 
 function buildComponents(presetInput) {
   const preset =
-    (typeof presetInput === 'string' ? PRESETS[presetInput] : presetInput) || PRESETS.oct1_warm;
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.oct1_warm;
 
   const parts = [
     {
@@ -177,10 +181,10 @@ function buildComponents(presetInput) {
       stage: 1,
       type: 'wire',
       name: 'V_REF Bridge',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'E4',
       to: 'F4',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'Links Top Row 4 and Bottom Row 4 as +4.4V hubs (probe at G4).'
     },
@@ -300,7 +304,7 @@ function buildComponents(presetInput) {
       value: '220nF Film',
       from: 'I6',
       to: 'I8',
-      color: '#a855f7',
+      color: '#38bdf8',
       net: 'Tracker AC Feed',
       notes: 'Exact 2-row box cap coupling buffered bass into Op-Amp A fundamental tracker.'
     },
@@ -351,10 +355,10 @@ function buildComponents(presetInput) {
       stage: 2,
       type: 'wire',
       name: 'Pin 3 V_REF Bias',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'I4',
       to: 'H11',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'References Op-Amp A Pin 3 (F11) to +4.4V V_REF.'
     },
@@ -388,7 +392,7 @@ function buildComponents(presetInput) {
       value: preset.trkCap,
       from: 'H9',
       to: 'H10',
-      color: '#c084fc',
+      color: '#38bdf8',
       net: 'Harmonic Stripper LPF',
       notes:
         '1-row box cap in parallel with 150k; strips string overtones so only pure fundamental reaches the zero-crossing detector.'
@@ -398,10 +402,10 @@ function buildComponents(presetInput) {
       stage: 2,
       type: 'wire',
       name: 'Tracker -> Comparator',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'I9',
       to: 'D11',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'Filtered Sine Fundamental',
       notes: 'Feeds boosted fundamental from Pin 1 (I9) into Schmitt Trigger Pin 6 (E11).'
     },
@@ -410,10 +414,10 @@ function buildComponents(presetInput) {
       stage: 2,
       type: 'wire',
       name: 'Schmitt V_REF Spur',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'H4',
       to: 'B13',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'Brings +4.4V V_REF right next to TL072 at Row 13 Top.'
     },

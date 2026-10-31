@@ -196,6 +196,7 @@ export function createStore(storageBackend) {
 
     isPartChecked(stageSlug, partId) {
       if (!isSafeStringKey(stageSlug) || !isSafeStringKey(partId)) return false;
+      if (!Object.hasOwn(state.stagePartChecks, stageSlug)) return false;
       const list = state.stagePartChecks[stageSlug];
       return Array.isArray(list) && list.includes(partId);
     },
@@ -203,7 +204,8 @@ export function createStore(storageBackend) {
     togglePartChecked(stageSlug, partId) {
       if (!isSafeStringKey(stageSlug) || !isSafeStringKey(partId)) return;
       const nextChecks = { ...state.stagePartChecks };
-      const current = new Set(nextChecks[stageSlug] || []);
+      const existing = Object.hasOwn(nextChecks, stageSlug) ? nextChecks[stageSlug] : [];
+      const current = new Set(Array.isArray(existing) ? existing : []);
       if (current.has(partId)) {
         current.delete(partId);
       } else {
@@ -211,7 +213,7 @@ export function createStore(storageBackend) {
       }
       if (current.size > 0) {
         nextChecks[stageSlug] = [...current];
-      } else {
+      } else if (Object.hasOwn(nextChecks, stageSlug)) {
         delete nextChecks[stageSlug];
       }
       state = { ...state, stagePartChecks: nextChecks };
@@ -221,7 +223,9 @@ export function createStore(storageBackend) {
     resetStageChecks(stageSlug) {
       if (!isSafeStringKey(stageSlug)) return;
       const nextChecks = { ...state.stagePartChecks };
-      delete nextChecks[stageSlug];
+      if (Object.hasOwn(nextChecks, stageSlug)) {
+        delete nextChecks[stageSlug];
+      }
       state = { ...state, stagePartChecks: nextChecks };
       commit();
     },

@@ -76,7 +76,11 @@ function withPartMeta(part) {
 
 function buildComponents(presetInput) {
   const preset =
-    (typeof presetInput === 'string' ? PRESETS[presetInput] : presetInput) || PRESETS.sub_quack;
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.sub_quack;
 
   const parts = [
     {
@@ -177,10 +181,10 @@ function buildComponents(presetInput) {
       stage: 1,
       type: 'wire',
       name: 'V_REF Bridge',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'E9',
       to: 'F9',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'Links Top Row 9 and Bottom Row 9 as +4.4V hubs (probe at G9).'
     },
@@ -349,10 +353,10 @@ function buildComponents(presetInput) {
       stage: 2,
       type: 'wire',
       name: 'Sens V_REF Tie',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'H9',
       to: 'H10',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'References C_SENS to +4.4V virtual ground.'
     },
@@ -361,10 +365,10 @@ function buildComponents(presetInput) {
       stage: 3,
       type: 'wire',
       name: 'Pin 5 V_REF Spur',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'D9',
       to: 'D15',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'Biases Op-Amp B Pin 5 (E15) to +4.4V and brings V_REF next to the vactrol.'
     },
@@ -373,10 +377,10 @@ function buildComponents(presetInput) {
       stage: 3,
       type: 'wire',
       name: 'Vactrol V_REF Return',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'B15',
       to: 'B18',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'Makes Row 18 Top the shared +4.4V return for both Vactrol LED cathode and LDR.'
     },

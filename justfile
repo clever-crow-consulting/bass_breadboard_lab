@@ -10,7 +10,7 @@ site-serve port="8765":
     PORT="{{port}}" node scripts/serve_local.mjs
 
 site-test:
-    node --test tests/*.test.mjs
+    node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --test tests/*.test.mjs
 
 site-lint:
     node scripts/check_site.mjs

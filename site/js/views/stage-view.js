@@ -204,6 +204,10 @@ function buildInspectorMarkup({ parts, selectedPartId, hoveredNet, hoverMeta, st
   </div>`;
 }
 
+function getOwnProp(obj, key) {
+  return obj && typeof key === 'string' && Object.hasOwn(obj, key) ? obj[key] : undefined;
+}
+
 export function mountStageView(container, { stage, store, audioStudio, router } = {}) {
   if (!container || !stage || !store || !audioStudio) {
     return () => {};
@@ -218,6 +222,7 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
   let currentParts = [];
   let currentTransition = null;
   let breadboardCleanup = null;
+  let disposed = false;
 
   const initialStoreState = store.getState();
   let lastTheme = initialStoreState.theme;
@@ -250,7 +255,7 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
 
   const knobsHtml = knobs
     .map((knob) => {
-      const val = initialAudio.knobs?.[knob.id] ?? knob.val;
+      const val = getOwnProp(initialAudio.knobs, knob.id) ?? knob.val;
       const inputId = `knob-${stage.slug}-${knob.id}`;
       return `<div class="knob-card">
         <div class="knob-label-row">
@@ -364,7 +369,8 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
     const prevStage = stageIdx > 0 ? ORDERED_STAGES[stageIdx - 1] : null;
     const nextStage =
       stageIdx >= 0 && stageIdx < ORDERED_STAGES.length - 1 ? ORDERED_STAGES[stageIdx + 1] : null;
-    const activePreset = stage.presets[activePresetId] || stage.presets[stage.defaultPresetId];
+    const activePreset =
+      getOwnProp(stage.presets, activePresetId) || getOwnProp(stage.presets, stage.defaultPresetId);
     const phaseLabel =
       activePreset?.phaseLabel ||
       (stage.phaseDegrees === 180 ? '180 deg phase inverted' : '0 deg non-inverting');
@@ -392,7 +398,7 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
   function renderVariantControls() {
     const presets = Object.values(stage.presets || {});
     const modes = Object.values(stage.modes || {});
-    const activePreset = stage.presets[activePresetId] || presets[0];
+    const activePreset = getOwnProp(stage.presets, activePresetId) || presets[0];
 
     const presetBtnsHtml = presets
       .map((preset) => {
@@ -467,8 +473,10 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
 
   function renderBreadboard({ rebind = false } = {}) {
     const state = store.getState();
-    const checkedIds = new Set(state.stagePartChecks?.[stage.slug] || []);
-    const activePreset = stage.presets[activePresetId] || stage.presets[stage.defaultPresetId];
+    const rawChecked = getOwnProp(state.stagePartChecks, stage.slug);
+    const checkedIds = new Set(Array.isArray(rawChecked) ? rawChecked : []);
+    const activePreset =
+      getOwnProp(stage.presets, activePresetId) || getOwnProp(stage.presets, stage.defaultPresetId);
 
     breadboardToolbarEl.innerHTML = `<span><strong class="mono">${currentParts.length}</strong> components on 30-row protoboard (<span class="mono">${checkedIds.size}</span> wired)</span>
       <span>${
@@ -533,7 +541,8 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
 
   function renderWiringChecklist() {
     const state = store.getState();
-    const checkedSet = new Set(state.stagePartChecks?.[stage.slug] || []);
+    const rawChecked = getOwnProp(state.stagePartChecks, stage.slug);
+    const checkedSet = new Set(Array.isArray(rawChecked) ? rawChecked : []);
     const checkedCount = currentParts.filter((p) => checkedSet.has(p.id)).length;
 
     const itemsHtml = currentParts
@@ -601,7 +610,7 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
     }
 
     for (const knob of knobs) {
-      const val = st.knobs?.[knob.id] ?? knob.val;
+      const val = getOwnProp(st.knobs, knob.id) ?? knob.val;
       const readout = container.querySelector(`[data-knob-readout="${knob.id}"]`);
       if (readout) {
         readout.textContent = formatKnobValue(knob, val);
@@ -626,7 +635,7 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
 
       if (action === 'select-preset') {
         const nextPreset = actionEl.getAttribute('data-preset-id');
-        if (nextPreset && stage.presets[nextPreset] && nextPreset !== activePresetId) {
+        if (nextPreset && getOwnProp(stage.presets, nextPreset) && nextPreset !== activePresetId) {
           activePresetId = nextPreset;
           hoveredNet = null;
           hoverMeta = null;
@@ -645,7 +654,7 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
 
       if (action === 'select-mode') {
         const nextMode = actionEl.getAttribute('data-mode-id');
-        if (nextMode && stage.modes[nextMode] && nextMode !== activeModeId) {
+        if (nextMode && getOwnProp(stage.modes, nextMode) && nextMode !== activeModeId) {
           activeModeId = nextMode;
           hoveredNet = null;
           hoverMeta = null;
@@ -695,13 +704,23 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
       }
 
       if (action === 'studio-toggle-play') {
-        audioStudio.togglePlay();
+        audioStudio
+          .togglePlay()
+          .then(() => {
+            if (!disposed) syncStudioControls();
+          })
+          .catch(() => {});
         syncStudioControls();
         return;
       }
 
       if (action === 'studio-pluck') {
-        audioStudio.triggerPluck();
+        audioStudio
+          .triggerPluck()
+          .then(() => {
+            if (!disposed) syncStudioControls();
+          })
+          .catch(() => {});
         syncStudioControls();
         return;
       }
@@ -788,7 +807,9 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
   });
 
   const cleanup = () => {
+    disposed = true;
     unsubscribeStore();
+    audioStudio.bindScopeCanvas(null);
     if (typeof breadboardCleanup === 'function') {
       breadboardCleanup();
       breadboardCleanup = null;

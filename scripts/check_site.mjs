@@ -16,6 +16,7 @@ const ROOT_SELECTOR_RE = /(?:^|[\s,}])\:root(?=[\s,{])/m;
 const CSS_FONT_SIZE_RE = /font-size\s*:\s*([0-9]+(?:\.[0-9]+)?)px/gi;
 const ATTR_FONT_SIZE_RE = /font-size\s*=\s*["']([0-9]+(?:\.[0-9]+)?)(?:px)?["']/gi;
 const CANVAS_FONT_RE = /\b([0-9]+(?:\.[0-9]+)?)px\s+(?:ui-monospace|monospace|system-ui|sans-serif|Inter|JetBrains)/gi;
+const PURPLE_HEX_RE = /#(?:a855f7|c084fc|9333ea|7e22ce|8b5cf6|a78bfa)(?:[0-9a-f]{2})?\b/gi;
 const URL_RE = /https?:\/\/[^\s"'`)<>]+/g;
 const IMPORT_RE = /(?:import|export)\s+(?:[^'";]*?\s+from\s+)?['"](\.[^'"]+)['"]/g;
 
@@ -51,6 +52,9 @@ export function scanTextForViolations(relPath, content) {
       if (Number(match[1]) < 12) {
         violations.push(`${normPath}: canvas font ${match[1]}px is below the 12px minimum`);
       }
+    }
+    for (const match of content.matchAll(PURPLE_HEX_RE)) {
+      violations.push(`${normPath}: contains forbidden purple hex accent ${match[0]}`);
     }
   }
 

@@ -94,9 +94,17 @@ function withPartMeta(part) {
 
 function buildComponents(presetInput, modeInput) {
   const preset =
-    (typeof presetInput === 'string' ? PRESETS[presetInput] : presetInput) || PRESETS.npn_passive;
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.npn_passive;
   const woolMode =
-    (typeof modeInput === 'string' ? MODES[modeInput] : modeInput) || MODES.max_wool;
+    (typeof modeInput === 'string'
+      ? Object.hasOwn(MODES, modeInput)
+        ? MODES[modeInput]
+        : null
+      : modeInput) || MODES.max_wool;
   const pnp = preset.isPNP;
 
   const parts = [
@@ -292,10 +300,10 @@ function buildComponents(presetInput, modeInput) {
       stage: 3,
       type: 'wire',
       name: 'Pinch Tap',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'D14',
       to: 'F10',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'Pinch Bias Starve',
       notes: 'Routes Q1 Base across the ravine to Pinch Lug 3 (Row 10 Bottom).'
     },
@@ -454,7 +462,7 @@ function buildComponents(presetInput, modeInput) {
       value: '4.7nF Film',
       from: 'C24',
       to: 'C26',
-      color: '#a855f7',
+      color: '#38bdf8',
       net: '1 kHz Treble High-Pass',
       notes: 'Passes upper-mid synth snarl into Row 26 Top.'
     },

@@ -115,8 +115,17 @@ function withPartMeta(part) {
 
 function buildComponents(presetInput, modeInput) {
   const preset =
-    (typeof presetInput === 'string' ? PRESETS[presetInput] : presetInput) || PRESETS.npn_mpsa13;
-  const mode = (typeof modeInput === 'string' ? MODES[modeInput] : modeInput) || MODES.stock;
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.npn_mpsa13;
+  const mode =
+    (typeof modeInput === 'string'
+      ? Object.hasOwn(MODES, modeInput)
+        ? MODES[modeInput]
+        : null
+      : modeInput) || MODES.stock;
   const modId = mode.id;
 
   const parts = [

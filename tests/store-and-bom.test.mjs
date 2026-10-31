@@ -104,6 +104,20 @@ test('store persists versioned state, recovers from corrupt JSON, and falls back
   quotaStore.toggleBomOwned('cap_470nf');
   assert.equal(quotaStore.isUsingMemoryFallback(), true);
   assert.deepEqual(quotaStore.getState().bomOwnedIds, ['cap_470nf']);
+
+  const protoKeyStore = createStore(makeMockStorage());
+  assert.equal(protoKeyStore.isPartChecked('toString', 'R1'), false);
+  assert.equal(protoKeyStore.isPartChecked('valueOf', 'R1'), false);
+  assert.doesNotThrow(() => protoKeyStore.resetStageChecks('valueOf'));
+  assert.doesNotThrow(() => protoKeyStore.togglePartChecked('toString', 'R1'));
+  assert.equal(protoKeyStore.isPartChecked('toString', 'R1'), true);
+  assert.doesNotThrow(() => protoKeyStore.togglePartChecked('toString', 'R1'));
+  assert.equal(protoKeyStore.isPartChecked('toString', 'R1'), false);
+  assert.deepEqual(protoKeyStore.getState().stagePartChecks, {});
+  assert.doesNotThrow(() => protoKeyStore.togglePartChecked('valueOf', 'C1'));
+  assert.equal(protoKeyStore.isPartChecked('valueOf', 'C1'), true);
+  assert.doesNotThrow(() => protoKeyStore.resetStageChecks('valueOf'));
+  assert.equal(protoKeyStore.isPartChecked('valueOf', 'C1'), false);
 });
 
 test('router parses all valid routes, handles case-insensitive slugs, and normalizes unknown hashes on start', () => {
@@ -208,6 +222,18 @@ test('curriculum roadmap and 41-item BOM filter and export cleanly', () => {
   const stage4Only = filterBomItems(BOM_ITEMS, { stageFilter: '4' });
   assert.equal(stage4Only.some((item) => item.part.includes('CD4049UBE')), true);
   assert.equal(stage4Only.some((item) => item.part.includes('CD4013BE')), false);
+  assert.equal(stage4Only.some((item) => item.id === 'cap_47uf'), false, 'Stage 4 self-biased CMOS must not list 47uF V_REF cap');
+
+  const cap47 = BOM_ITEMS.find((item) => item.id === 'cap_47uf');
+  assert.ok(cap47);
+  assert.deepEqual(cap47.stages, ['3', '5a', '5b', '6']);
+  for (const vrefStage of ['3', '5a', '5b', '6']) {
+    assert.equal(
+      filterBomItems(BOM_ITEMS, { stageFilter: vrefStage }).some((item) => item.id === 'cap_47uf'),
+      true,
+      `expected cap_47uf in stage ${vrefStage}`
+    );
+  }
 
   const stage4Semis = filterBomItems(BOM_ITEMS, { stageFilter: '4', category: 'semiconductors' });
   assert.equal(stage4Semis.every((item) => item.category === 'semiconductors'), true);

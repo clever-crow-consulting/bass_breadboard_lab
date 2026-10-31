@@ -363,7 +363,12 @@ test('createAudioStudio runs singleton DSP loop, crossfades stage and variant sw
     doc: mockDoc
   });
 
-  studio.attachStage(ORDERED_STAGES[0], {});
+  studio.attachStage(ORDERED_STAGES[0], { presetId: 'toString', modeId: 'valueOf' });
+  assert.equal(studio.getState().presetId, ORDERED_STAGES[0].defaultPresetId);
+  assert.equal(studio.getState().modeId, ORDERED_STAGES[0].defaultModeId);
+  studio.updateVariant({ presetId: 'constructor', modeId: 'toString' });
+  assert.equal(studio.getState().presetId, ORDERED_STAGES[0].defaultPresetId);
+  assert.equal(studio.getState().modeId, ORDERED_STAGES[0].defaultModeId);
   assert.equal(instanceCount, 0, 'AudioContext must be created lazily on play/pluck');
 
   const playPromise = studio.play();
@@ -419,4 +424,73 @@ test('createAudioStudio runs singleton DSP loop, crossfades stage and variant sw
   studio.destroy();
   assert.equal(docListeners.size, 0);
   assert.equal(winListeners.size, 0);
+});
+
+test('createAudioStudio recovers cleanly when AudioContext.resume() rejects on play and triggerPluck', async () => {
+  let rafCancelCount = 0;
+  class RejectingAudioContext {
+    constructor() {
+      this.sampleRate = 48000;
+      this.state = 'suspended';
+      this.destination = {};
+    }
+    async resume() {
+      throw new Error('NotAllowedError: play() blocked by autoplay policy');
+    }
+    createConstantSource() {
+      return { offset: { value: 0 }, connect() {}, start() {}, disconnect() {} };
+    }
+    createGain() {
+      return { gain: { value: 1 }, connect() {}, disconnect() {} };
+    }
+    createScriptProcessor(bufSize) {
+      return {
+        bufferSize: bufSize,
+        onaudioprocess: null,
+        connect() {},
+        disconnect() {}
+      };
+    }
+  }
+
+  const stateSnapshots = [];
+  const studio = createAudioStudio({
+    AudioContextClass: RejectingAudioContext,
+    win: {
+      addEventListener() {},
+      removeEventListener() {},
+      requestAnimationFrame: () => 42,
+      cancelAnimationFrame() {
+        rafCancelCount++;
+      }
+    },
+    doc: {
+      visibilityState: 'visible',
+      addEventListener() {},
+      removeEventListener() {}
+    },
+    onChange(st) {
+      stateSnapshots.push(st.playing);
+    }
+  });
+
+  studio.attachStage(ORDERED_STAGES[0], {});
+  stateSnapshots.length = 0;
+
+  const playResult = await studio.play();
+  assert.equal(playResult, false);
+  assert.equal(studio.getState().playing, false);
+  assert.deepEqual(stateSnapshots, [true, false]);
+  assert.equal(rafCancelCount, 1);
+
+  const toggleResult = await studio.togglePlay();
+  assert.equal(toggleResult, false);
+  assert.equal(studio.getState().playing, false);
+
+  const pluckResult = await studio.triggerPluck();
+  assert.equal(pluckResult, false);
+  assert.equal(studio.getState().playing, false);
+  assert.equal(studio.getState().oneShotMode, false);
+
+  studio.destroy();
 });

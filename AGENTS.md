@@ -25,7 +25,7 @@ Run `just --list` to inspect available recipes. All recipes use big-endian `site
 
 - `just site-serve`: serves `site/` locally on `0.0.0.0` at `$PORT` (defaults to `8765`) and prints `http://localhost:$PORT`.
 - `just site-lint`: runs `node scripts/check_site.mjs` across tracked text files and `site/js/` module imports.
-- `just site-test`: runs `node --test tests/*.test.mjs`.
+- `just site-test`: runs `node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --test tests/*.test.mjs`.
 - `just site-check`: runs `site-lint` followed by `site-test`. Run this gate before every commit.
 
 In shell commands and documentation examples, always define environment variables before referencing them:
@@ -47,7 +47,7 @@ Debian Node 22 note: Debian's `/usr/bin/node` omits `internal/deps/brace-expansi
 
 ```bash
 NVM_BIN="$HOME/.nvm/versions/node/v22.16.0/bin"
-PATH="$NVM_BIN:$PATH" node --test tests/check-site.test.mjs
+PATH="$NVM_BIN:$PATH" node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --test tests/check-site.test.mjs
 ```
 
 ## Static site and UI guardrails

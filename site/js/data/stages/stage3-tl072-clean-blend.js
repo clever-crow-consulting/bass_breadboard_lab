@@ -83,8 +83,11 @@ function withPartMeta(part) {
 
 function buildComponents(presetInput) {
   const preset =
-    (typeof presetInput === 'string' ? PRESETS[presetInput] : presetInput) ||
-    PRESETS.biamp_crossover;
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.biamp_crossover;
 
   const parts = [
     {
@@ -186,10 +189,10 @@ function buildComponents(presetInput) {
       stage: 1,
       type: 'wire',
       name: 'V_REF Bridge',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'E10',
       to: 'F10',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'Makes both Top Row 10 and Bottom Row 10 +4.4V V_REF hubs (probe at G10).'
     },
@@ -412,10 +415,10 @@ function buildComponents(presetInput) {
         stage: 3,
         type: 'wire',
         name: 'HPF V_REF Tie',
-        value: 'Purple Jumper',
+        value: 'Teal Jumper',
         from: 'D10',
         to: 'B23',
-        color: '#a855f7',
+        color: '#14b8a6',
         net: 'V_REF (+4.4V) Hub',
         notes: 'Anchors grit high-pass leg to virtual ground.'
       }
@@ -427,10 +430,10 @@ function buildComponents(presetInput) {
         stage: 3,
         type: 'wire',
         name: 'Pin 5 V_REF',
-        value: 'Purple Jumper',
+        value: 'Teal Jumper',
         from: 'D10',
         to: 'D16',
-        color: '#a855f7',
+        color: '#14b8a6',
         net: 'V_REF (+4.4V) Hub',
         notes:
           'Grounds non-inverting Pin 5 to AC virtual ground so Op-Amp B runs in 180-degree inverting mode.'

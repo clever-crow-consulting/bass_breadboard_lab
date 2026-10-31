@@ -30,7 +30,7 @@ jobs:
         run: node scripts/check_site.mjs
 
       - name: Run automated test suites
-        run: node --test tests/*.test.mjs
+        run: node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --test tests/*.test.mjs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

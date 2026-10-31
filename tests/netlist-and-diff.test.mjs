@@ -22,8 +22,13 @@ test('all 7 stages validate cleanly with zero breadboard hole collisions across 
     ['1', '2', '3', '4', '5a', '5b', '6']
   );
   assert.equal(getStage('unknown'), null);
+  assert.equal(getStage('constructor'), null);
+  assert.equal(getStage('toString'), null);
+  assert.equal(getStage('valueOf'), null);
   assert.deepEqual(getStageParts('unknown'), []);
+  assert.deepEqual(getStageParts('constructor', 'toString', 'valueOf'), []);
   assert.deepEqual(getStageDefaultParts('unknown'), []);
+  assert.deepEqual(getStageParts('1', 'toString', 'valueOf'), getStageDefaultParts('1'));
 
   for (const stage of ORDERED_STAGES) {
     assert.equal(getStage(stage.slug), stage);

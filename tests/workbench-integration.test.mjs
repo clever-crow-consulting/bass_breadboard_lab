@@ -766,14 +766,58 @@ test('mountBomView filters rows, toggles owned parts and category batches, and s
   assert.match(copiedText || '', /CD4049UBE/);
   assert.match(appRoot.innerHTML, /Copied Markdown/);
 
+  const cd4049Check = appRoot.querySelector('input[data-item-id="semi_cd4049ube"]');
+  assert.ok(cd4049Check);
+  cd4049Check.click();
+  assert.doesNotMatch(appRoot.innerHTML, /Copied Markdown/, 'toggling owned checkbox must clear stale copyStatus');
+  cd4049Check.click();
+
   cleanup();
 
   const cleanupFallback = mountBomView(appRoot, { store, clipboard: null });
   appRoot.querySelector('[data-action="copy-plain"]').click();
   await new Promise((r) => setTimeout(r, 0));
-  const fallbackTextarea = appRoot.querySelector('textarea.bom-export-textarea');
+  let fallbackTextarea = appRoot.querySelector('textarea.bom-export-textarea');
   assert.ok(fallbackTextarea, 'expected fallback textarea when clipboard API is unavailable');
   assert.match(fallbackTextarea.value, /Bass Breadboard Lab shopping list/);
+  assert.match(fallbackTextarea.value, /CD4013BE/);
+  assert.match(fallbackTextarea.value, /4x 47uF/);
+
+  const fbStageSelect = appRoot.querySelector('select[data-filter="stageFilter"]');
+  fbStageSelect.value = '4';
+  fbStageSelect.dispatchEvent({ type: 'change', target: fbStageSelect, bubbles: true });
+  assert.doesNotMatch(appRoot.innerHTML, /Clipboard unavailable/, 'filter change must clear copyStatus');
+  fallbackTextarea = appRoot.querySelector('textarea.bom-export-textarea');
+  assert.ok(fallbackTextarea, 'open fallback export drawer must stay open and refresh on filter change');
+  assert.match(fallbackTextarea.value, /CD4049UBE/);
+  assert.doesNotMatch(fallbackTextarea.value, /CD4013BE/);
+  assert.doesNotMatch(fallbackTextarea.value, /4x 47uF/);
+
+  appRoot.querySelector('[data-action="copy-markdown"]').click();
+  await new Promise((r) => setTimeout(r, 0));
+  fallbackTextarea = appRoot.querySelector('textarea.bom-export-textarea');
+  assert.match(fallbackTextarea.value, /# Bass Breadboard Lab shopping list/);
+  assert.match(fallbackTextarea.value, /- \[ \] \*\*2x CD4049UBE\*\*/);
+
+  const fbCd4049Check = appRoot.querySelector('input[data-item-id="semi_cd4049ube"]');
+  fbCd4049Check.click();
+  assert.doesNotMatch(appRoot.innerHTML, /Clipboard unavailable/, 'checkbox change must clear copyStatus');
+  fallbackTextarea = appRoot.querySelector('textarea.bom-export-textarea');
+  assert.match(
+    fallbackTextarea.value,
+    /- \[x\] \*\*2x CD4049UBE\*\*/,
+    'fallback Markdown export must refresh when owned state changes'
+  );
+
+  const fbHideOwned = appRoot.querySelector('input[data-filter="hideOwned"]');
+  fbHideOwned.click();
+  fallbackTextarea = appRoot.querySelector('textarea.bom-export-textarea');
+  assert.doesNotMatch(
+    fallbackTextarea.value,
+    /CD4049UBE/,
+    'fallback export must exclude owned items when hideOwned is enabled'
+  );
+
   cleanupFallback();
 });
 
@@ -924,17 +968,48 @@ test('initWorkbenchApp manages theme attribute, keeps audio smooth across stage-
   assert.equal(app.audioStudio.getState().stageSlug, '3');
   assert.equal(tracker.count, 1, 'singleton AudioContext must be reused across stage transitions');
 
+  const stage3Canvas = doc.body.querySelector('canvas[data-role="scope-canvas"]');
+  assert.ok(stage3Canvas);
+  let detachedCanvasDraws = 0;
+  const stage3Ctx = stage3Canvas.getContext('2d');
+  const origFillRect = stage3Ctx.fillRect;
+  stage3Ctx.fillRect = (...args) => {
+    detachedCanvasDraws++;
+    return origFillRect.apply(stage3Ctx, args);
+  };
+
   app.router.navigate('#/bom');
   assert.equal(app.audioStudio.getState().playing, false, 'audio must stop immediately when navigating to #/bom');
   assert.equal(doc.body.querySelector('[data-action="header-stop-audio"]'), null);
+  detachedCanvasDraws = 0;
+  app.audioStudio.toggleBypass();
+  app.audioStudio.stop();
+  assert.equal(
+    detachedCanvasDraws,
+    0,
+    'cleanup() must unbind scopeCanvas so detached stage canvas is not retained or redrawn on #/bom'
+  );
 
   app.router.navigate('#/stage/5a');
+  const stage5aCanvas = doc.body.querySelector('canvas[data-role="scope-canvas"]');
+  let detachedStage5aDraws = 0;
+  stage5aCanvas.getContext('2d').fillRect = () => {
+    detachedStage5aDraws++;
+  };
   doc.body.querySelector('[data-action="studio-toggle-play"]').click();
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(app.audioStudio.getState().playing, true);
 
   app.router.navigate('#/');
   assert.equal(app.audioStudio.getState().playing, false, 'audio must stop immediately when navigating to #/');
+  detachedStage5aDraws = 0;
+  app.audioStudio.toggleBypass();
+  app.audioStudio.stop();
+  assert.equal(
+    detachedStage5aDraws,
+    0,
+    'cleanup() must unbind scopeCanvas when navigating from #/stage/* to #/'
+  );
 
   app.router.navigate('#/stage/6');
   doc.body.querySelector('[data-action="studio-toggle-play"]').click();
@@ -954,4 +1029,56 @@ test('initWorkbenchApp manages theme attribute, keeps audio smooth across stage-
   }
 
   app.destroy();
+});
+
+test('mountStageView handles rejecting AudioContext.resume() on play and pluck clicks without unhandled rejections or wedged buttons', async () => {
+  const { doc, win, storage, appRoot } = createMiniEnv('#/stage/1');
+  const store = createStore(storage);
+  const router = createRouter(win);
+
+  class RejectingAudioContext {
+    constructor() {
+      this.sampleRate = 48000;
+      this.state = 'suspended';
+      this.destination = {};
+    }
+    async resume() {
+      throw new Error('Blocked by autoplay policy');
+    }
+    createConstantSource() {
+      return { offset: { value: 0 }, connect() {}, start() {}, disconnect() {} };
+    }
+    createGain() {
+      return { gain: { value: 1 }, connect() {}, disconnect() {} };
+    }
+    createScriptProcessor(bufSize) {
+      return { bufferSize: bufSize, onaudioprocess: null, connect() {}, disconnect() {} };
+    }
+  }
+
+  const audioStudio = createAudioStudio({ AudioContextClass: RejectingAudioContext, win, doc });
+  const cleanup = mountStageView(appRoot, {
+    stage: getStage('1'),
+    store,
+    audioStudio,
+    router
+  });
+
+  const playBtn = appRoot.querySelector('[data-action="studio-toggle-play"]');
+  const pluckBtn = appRoot.querySelector('[data-action="studio-pluck"]');
+  assert.ok(playBtn && pluckBtn);
+
+  playBtn.click();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(audioStudio.getState().playing, false);
+  assert.equal(playBtn.textContent, 'Play Riff Loop');
+  assert.equal(playBtn.getAttribute('aria-pressed'), 'false');
+
+  pluckBtn.click();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(audioStudio.getState().playing, false);
+  assert.equal(playBtn.textContent, 'Play Riff Loop');
+
+  cleanup();
+  audioStudio.destroy();
 });

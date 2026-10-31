@@ -320,7 +320,9 @@ export function createAudioStudio({
 
         const srcBuf = oneShotMode
           ? riffs.singlePluck
-          : riffs[riffId] || riffs.groove;
+          : Object.hasOwn(riffs, riffId)
+            ? riffs[riffId]
+            : riffs.groove;
         const targetBypass = bypass ? 1.0 : 0.0;
 
         for (let i = 0; i < out.length; i++) {
@@ -369,11 +371,15 @@ export function createAudioStudio({
 
     const sameStage = activeStage && activeStage.slug === stageDescriptor.slug;
     const nextPresetId =
-      presetId && stageDescriptor.presets?.[presetId]
+      typeof presetId === 'string' &&
+      stageDescriptor.presets &&
+      Object.hasOwn(stageDescriptor.presets, presetId)
         ? presetId
         : stageDescriptor.defaultPresetId;
     const nextModeId =
-      modeId && stageDescriptor.modes?.[modeId]
+      typeof modeId === 'string' &&
+      stageDescriptor.modes &&
+      Object.hasOwn(stageDescriptor.modes, modeId)
         ? modeId
         : stageDescriptor.defaultModeId;
 
@@ -382,7 +388,7 @@ export function createAudioStudio({
       ? stageDescriptor.audioSpec.knobs
       : [];
     for (const def of knobDefs) {
-      if (sameStage && Object.prototype.hasOwnProperty.call(knobs, def.id)) {
+      if (sameStage && Object.hasOwn(knobs, def.id)) {
         nextKnobs[def.id] = knobs[def.id];
       } else {
         nextKnobs[def.id] = def.val;
@@ -421,9 +427,17 @@ export function createAudioStudio({
   function updateVariant({ presetId, modeId } = {}) {
     if (!activeStage) return getState();
     const nextPresetId =
-      presetId && activeStage.presets?.[presetId] ? presetId : activePresetId;
+      typeof presetId === 'string' &&
+      activeStage.presets &&
+      Object.hasOwn(activeStage.presets, presetId)
+        ? presetId
+        : activePresetId;
     const nextModeId =
-      modeId && activeStage.modes?.[modeId] ? modeId : activeModeId;
+      typeof modeId === 'string' &&
+      activeStage.modes &&
+      Object.hasOwn(activeStage.modes, modeId)
+        ? modeId
+        : activeModeId;
 
     if (nextPresetId === activePresetId && nextModeId === activeModeId) {
       return getState();
@@ -485,7 +499,12 @@ export function createAudioStudio({
     startScopeLoop();
     emitChange();
     if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
-      await ctx.resume();
+      try {
+        await ctx.resume();
+      } catch {
+        stop();
+        return false;
+      }
     }
     return true;
   }
@@ -519,7 +538,12 @@ export function createAudioStudio({
     startScopeLoop();
     emitChange();
     if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
-      await ctx.resume();
+      try {
+        await ctx.resume();
+      } catch {
+        stop();
+        return false;
+      }
     }
     return true;
   }

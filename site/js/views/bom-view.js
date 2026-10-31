@@ -231,25 +231,49 @@ export function mountBomView(container, { store, clipboard } = {}) {
     });
   }
 
-  async function handleExport(kind) {
-    const state = store.getState();
+  function buildExportPayload(kind, state = store.getState()) {
     const visibleItems = filterBomItems(BOM_ITEMS, {
       ...filters,
       ownedIds: state.bomOwnedIds
     });
-    const isMarkdown = kind === 'markdown';
-    const text = isMarkdown
-      ? formatBomMarkdown(visibleItems, state.bomOwnedIds)
-      : formatBomPlainText(visibleItems, state.bomOwnedIds);
-    const label = isMarkdown ? 'Markdown shopping list' : 'Plain-text shopping list';
+    const normalizedKind = kind === 'markdown' ? 'markdown' : 'plain';
+    const text =
+      normalizedKind === 'markdown'
+        ? formatBomMarkdown(visibleItems, state.bomOwnedIds)
+        : formatBomPlainText(visibleItems, state.bomOwnedIds);
+    const label =
+      normalizedKind === 'markdown' ? 'Markdown shopping list' : 'Plain-text shopping list';
+    return {
+      kind: normalizedKind,
+      label,
+      text,
+      count: visibleItems.length
+    };
+  }
+
+  function syncExportOnStateOrFilterChange() {
+    copyStatus = '';
+    if (fallbackExport) {
+      const refreshed = buildExportPayload(fallbackExport.kind);
+      fallbackExport = {
+        kind: refreshed.kind,
+        label: refreshed.label,
+        text: refreshed.text
+      };
+    }
+  }
+
+  async function handleExport(kind) {
+    const payload = buildExportPayload(kind);
 
     const clip = resolveClipboard();
     if (clip && typeof clip.writeText === 'function') {
       try {
-        await clip.writeText(text);
-        copyStatus = isMarkdown
-          ? `Copied Markdown (${visibleItems.length} items)`
-          : `Copied Plain Text (${visibleItems.length} items)`;
+        await clip.writeText(payload.text);
+        copyStatus =
+          payload.kind === 'markdown'
+            ? `Copied Markdown (${payload.count} items)`
+            : `Copied Plain Text (${payload.count} items)`;
         fallbackExport = null;
         render();
         return;
@@ -259,7 +283,11 @@ export function mountBomView(container, { store, clipboard } = {}) {
     }
 
     copyStatus = 'Clipboard unavailable: copy from box below';
-    fallbackExport = { label, text };
+    fallbackExport = {
+      kind: payload.kind,
+      label: payload.label,
+      text: payload.text
+    };
     render();
   }
 
@@ -269,19 +297,19 @@ export function mountBomView(container, { store, clipboard } = {}) {
       const filterKey = filterEl.getAttribute('data-filter');
       if (filterKey === 'stageFilter') {
         filters = { ...filters, stageFilter: filterEl.value || 'all' };
-        copyStatus = '';
+        syncExportOnStateOrFilterChange();
         render();
         return;
       }
       if (filterKey === 'category') {
         filters = { ...filters, category: filterEl.value || 'all' };
-        copyStatus = '';
+        syncExportOnStateOrFilterChange();
         render();
         return;
       }
       if (filterKey === 'hideOwned') {
         filters = { ...filters, hideOwned: Boolean(filterEl.checked) };
-        copyStatus = '';
+        syncExportOnStateOrFilterChange();
         render();
         return;
       }
@@ -329,6 +357,7 @@ export function mountBomView(container, { store, clipboard } = {}) {
   container.addEventListener('change', onChange);
   container.addEventListener('click', onClick);
   const unsubscribe = store.subscribe(() => {
+    syncExportOnStateOrFilterChange();
     render();
   });
 

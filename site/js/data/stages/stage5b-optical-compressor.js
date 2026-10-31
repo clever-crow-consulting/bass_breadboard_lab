@@ -76,7 +76,11 @@ function withPartMeta(part) {
 
 function buildComponents(presetInput) {
   const preset =
-    (typeof presetInput === 'string' ? PRESETS[presetInput] : presetInput) || PRESETS.studio_glue;
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.studio_glue;
 
   const parts = [
     {
@@ -177,10 +181,10 @@ function buildComponents(presetInput) {
       stage: 1,
       type: 'wire',
       name: 'V_REF Bridge',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'E9',
       to: 'F9',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'Links Top Row 9 and Bottom Row 9 as +4.4V hubs (probe at G9).'
     },
@@ -423,10 +427,10 @@ function buildComponents(presetInput) {
       stage: 3,
       type: 'wire',
       name: 'Sidechain V_REF Tie',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'A17',
       to: 'D9',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'References C_SIDE_DC to +4.4V V_REF.'
     },
@@ -483,10 +487,10 @@ function buildComponents(presetInput) {
       stage: 3,
       type: 'wire',
       name: 'LED V_REF Return',
-      value: 'Purple Jumper',
+      value: 'Teal Jumper',
       from: 'A20',
       to: 'J9',
-      color: '#a855f7',
+      color: '#14b8a6',
       net: 'V_REF (+4.4V) Hub',
       notes: 'Returns Row 20 Top (VAC_LED cathode & C_REL negative) to +4.4V V_REF.'
     },

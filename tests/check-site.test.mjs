@@ -51,6 +51,24 @@ test('scanTextForViolations flags emojis, :root CSS, sub-12px fonts, and externa
 
   const cdnHits = scanTextForViolations('site/index.html', '<script src="https://cdn.example.com/lib.js"></script>');
   assert.equal(cdnHits.some((v) => v.includes('external URL')), true);
+
+  for (const hex of ['#a855f7', '#c084fc', '#9333ea', '#7e22ce', '#8b5cf6', '#a78bfa']) {
+    const purpleHits = scanTextForViolations(
+      'site/js/data/stages/stage2-woolly-mammoth.js',
+      `const wire = { color: '${hex}' };`
+    );
+    assert.equal(
+      purpleHits.some((v) => v.includes('purple hex accent')),
+      true,
+      `expected purple hex check to flag ${hex}`
+    );
+  }
+
+  const tealAndCyanClean = scanTextForViolations(
+    'site/js/data/stages/stage2-woolly-mammoth.js',
+    "const wire = { color: '#14b8a6', capColor: '#38bdf8' };"
+  );
+  assert.deepEqual(tealAndCyanClean, []);
 });
 
 test('checkModuleImports detects missing relative imports and passes valid ones', () => {

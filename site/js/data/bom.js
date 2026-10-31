@@ -256,8 +256,8 @@ export const BOM_ITEMS = [
     part: '47uF',
     qty: 4,
     packageOrTaper: 'Radial Electrolytic',
-    stages: ['3', '4', '5a', '5b', '6'],
-    role: 'Stage 3 to 6 +4.5V virtual-ground (V_REF) reservoir'
+    stages: ['3', '5a', '5b', '6'],
+    role: 'Stages 3, 5A, 5B, and 6 +4.5V virtual-ground (V_REF) reservoir'
   },
   {
     id: 'cap_22uf',

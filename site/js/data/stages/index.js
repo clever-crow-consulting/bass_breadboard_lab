@@ -11,19 +11,24 @@ export const ORDERED_STAGES = [stage1, stage2, stage3, stage4, stage5a, stage5b,
 
 export const STAGES_BY_SLUG = Object.fromEntries(ORDERED_STAGES.map((s) => [s.slug, s]));
 
+function getOwnProp(obj, key) {
+  return obj && typeof key === 'string' && Object.hasOwn(obj, key) ? obj[key] : undefined;
+}
+
 export function getStage(slug) {
   if (typeof slug !== 'string' && typeof slug !== 'number') {
     return null;
   }
   const key = String(slug).trim().toLowerCase();
-  return STAGES_BY_SLUG[key] || null;
+  return getOwnProp(STAGES_BY_SLUG, key) || null;
 }
 
 export function getStageParts(slug, presetId, modeId) {
   const stage = getStage(slug);
   if (!stage) return [];
-  const preset = stage.presets[presetId] || stage.presets[stage.defaultPresetId];
-  const mode = stage.modes[modeId] || stage.modes[stage.defaultModeId];
+  const preset =
+    getOwnProp(stage.presets, presetId) || getOwnProp(stage.presets, stage.defaultPresetId);
+  const mode = getOwnProp(stage.modes, modeId) || getOwnProp(stage.modes, stage.defaultModeId);
   return stage.buildComponents(preset, mode);
 }
 
