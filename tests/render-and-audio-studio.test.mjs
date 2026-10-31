@@ -1,0 +1,346 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { ORDERED_STAGES, getStageParts, getDiffAgainstPrevious } from '../site/js/data/stages/index.js';
+import { traceConnectedNet } from '../site/js/breadboard-diff.js';
+import {
+  resolvePinCoord,
+  renderBreadboardSvg,
+  bindBreadboardInteractions
+} from '../site/js/breadboard-svg.js';
+import {
+  findRisingZeroCrossing,
+  drawOscilloscope,
+  createAudioStudio
+} from '../site/js/audio-studio.js';
+
+test('resolvePinCoord resolves holes, rails, and headers and returns null for invalid tokens', () => {
+  const a1 = resolvePinCoord('A1');
+  const e1 = resolvePinCoord('E1');
+  const f1 = resolvePinCoord('F1');
+  const j30 = resolvePinCoord('J30');
+  assert.ok(a1 && e1 && f1 && j30);
+  assert.equal(a1.x, e1.x);
+  assert.equal(a1.x, f1.x);
+  assert.equal(j30.x > a1.x, true);
+  assert.equal(e1.y > a1.y, true);
+  assert.equal(f1.y - e1.y > 40, true, 'expected center DIP ravine gap between E and F');
+
+  for (const token of ['TOP_PLUS_1', 'TOP_MINUS_15', 'BOT_PLUS_30', 'BOT_MINUS_8', 'HDR_IN', 'HDR_OUT', 'HDR_9V', 'HDR_GND']) {
+    const pos = resolvePinCoord(token);
+    assert.ok(pos && Number.isFinite(pos.x) && Number.isFinite(pos.y), `expected coordinate for ${token}`);
+  }
+
+  assert.equal(resolvePinCoord('Z99'), null);
+  assert.equal(resolvePinCoord('A31'), null);
+  assert.equal(resolvePinCoord(''), null);
+  assert.equal(resolvePinCoord(null), null);
+});
+
+test('renderBreadboardSvg renders all 7 stages across presets/modes, enforces >=12px SVG fonts, and applies diff opacities and outlines', () => {
+  for (const stage of ORDERED_STAGES) {
+    for (const preset of Object.values(stage.presets)) {
+      for (const mode of Object.values(stage.modes)) {
+        const parts = getStageParts(stage.slug, preset.id, mode.id);
+        const svg = renderBreadboardSvg({ preset, parts, theme: 'dark' });
+        assert.match(svg, /^<svg\b[^>]*viewBox="0 0 1060 540"/);
+        assert.match(svg, /xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+        assert.match(svg, /HDR_IN/);
+        assert.match(svg, /data-pin="A1"/);
+        assert.match(svg, /data-pin="J30"/);
+
+        for (const m of svg.matchAll(/font-size="([0-9.]+)"/g)) {
+          assert.equal(
+            Number(m[1]) >= 12,
+            true,
+            `Stage ${stage.slug} (${preset.id}/${mode.id}) has font-size=${m[1]} < 12`
+          );
+        }
+        for (const part of parts) {
+          assert.equal(
+            svg.includes(`data-part-id="${part.id}"`),
+            true,
+            `Stage ${stage.slug} missing SVG group for ${part.id}`
+          );
+        }
+      }
+    }
+  }
+
+  const s5aSvg = renderBreadboardSvg({
+    preset: ORDERED_STAGES[4].presets[ORDERED_STAGES[4].defaultPresetId],
+    parts: getStageParts('5a'),
+    theme: 'light'
+  });
+  assert.match(s5aSvg, /bb-vactrol-sleeve/);
+
+  const s2 = ORDERED_STAGES[1];
+  const s2Preset = s2.presets[s2.defaultPresetId];
+  const s2Parts = getStageParts('2');
+  const transition = getDiffAgainstPrevious('2');
+  const diffSvg = renderBreadboardSvg({
+    preset: s2Preset,
+    parts: s2Parts,
+    diffResult: transition.diff,
+    diffEnabled: true,
+    highlightedNet: traceConnectedNet(s2Parts, 'HDR_GND')
+  });
+  assert.match(diffSvg, /data-diff-status="unchanged"[^>]*opacity="0\.28"/);
+  assert.match(diffSvg, /data-diff-status="added"/);
+  assert.match(diffSvg, /#10b981/);
+  assert.match(diffSvg, /bb-net-strip/);
+
+  const s5bTransition = getDiffAgainstPrevious('5b');
+  const s5bParts = getStageParts('5b');
+  const s5bDiffSvg = renderBreadboardSvg({
+    preset: ORDERED_STAGES[5].presets[ORDERED_STAGES[5].defaultPresetId],
+    parts: s5bParts,
+    diffResult: s5bTransition.diff,
+    diffEnabled: true
+  });
+  assert.match(s5bDiffSvg, /data-diff-status="modified"/);
+  assert.match(s5bDiffSvg, /#f59e0b/);
+});
+
+test('bindBreadboardInteractions delegates click, mouseover, and mouseleave for parts and pins', () => {
+  const listeners = new Map();
+  const container = {
+    addEventListener(type, fn) {
+      listeners.set(type, fn);
+    },
+    removeEventListener(type, fn) {
+      if (listeners.get(type) === fn) listeners.delete(type);
+    }
+  };
+
+  const parts = getStageParts('1');
+  const selectedCalls = [];
+  const hoverCalls = [];
+
+  const cleanup = bindBreadboardInteractions(container, {
+    parts,
+    onSelectPart: (id) => selectedCalls.push(id),
+    onHoverNet: (net, info) => hoverCalls.push({ net, info })
+  });
+
+  const partChild = {
+    parentElement: {
+      getAttribute(attr) {
+        return attr === 'data-part-id' ? 'R_PWR' : null;
+      },
+      parentElement: container
+    },
+    getAttribute() {
+      return null;
+    }
+  };
+
+  listeners.get('click')({ target: partChild });
+  assert.deepEqual(selectedCalls, ['R_PWR']);
+
+  listeners.get('click')({ target: container });
+  assert.deepEqual(selectedCalls, ['R_PWR', null]);
+
+  listeners.get('mouseover')({ target: partChild });
+  assert.equal(hoverCalls.length, 1);
+  assert.equal(hoverCalls[0].net.partIds.has('R_PWR'), true);
+  assert.equal(hoverCalls[0].net.strips.has('TOP_ROW_2'), true);
+
+  const holeTarget = {
+    getAttribute(attr) {
+      return attr === 'data-pin' ? 'HDR_GND' : null;
+    },
+    parentElement: container
+  };
+  listeners.get('mouseover')({ target: holeTarget });
+  assert.equal(hoverCalls.length, 2);
+  assert.equal(hoverCalls[1].net.strips.has('TOP_MINUS'), true);
+
+  listeners.get('mouseleave')({});
+  assert.equal(hoverCalls.length, 3);
+  assert.equal(hoverCalls[2].net, null);
+
+  cleanup();
+  assert.equal(listeners.size, 0);
+});
+
+test('findRisingZeroCrossing locates rising zero crossing deterministically and drawOscilloscope enforces >=12px canvas font', () => {
+  const buf = new Float32Array(256);
+  for (let i = 0; i < buf.length; i++) {
+    buf[i] = Math.sin((2 * Math.PI * (i - 17)) / 64);
+  }
+  const idx = findRisingZeroCrossing(buf, 128);
+  assert.equal(buf[idx - 1] <= 0 && buf[idx] > 0, true);
+  assert.equal(findRisingZeroCrossing(new Float32Array(32).fill(-0.2), 32), 0);
+
+  const strokes = [];
+  const fonts = [];
+  const mockCanvas = {
+    width: 560,
+    height: 150,
+    getContext(kind) {
+      assert.equal(kind, '2d');
+      return {
+        set fillStyle(_v) {},
+        set strokeStyle(v) {
+          strokes.push(v);
+        },
+        set lineWidth(_v) {},
+        set font(v) {
+          fonts.push(v);
+        },
+        fillRect() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        stroke() {},
+        fillText() {},
+        setLineDash() {}
+      };
+    }
+  };
+
+  drawOscilloscope(mockCanvas, {
+    dryBuffer: buf,
+    wetBuffer: buf,
+    bypass: false,
+    theme: 'dark'
+  });
+  assert.equal(strokes.includes('#22c55e'), true);
+  assert.equal(strokes.includes('#f59e0b'), true);
+  assert.equal(fonts.length > 0, true);
+  for (const f of fonts) {
+    const m = f.match(/([0-9.]+)px/);
+    assert.ok(m && Number(m[1]) >= 12, `expected canvas font >= 12px, got ${f}`);
+  }
+
+  strokes.length = 0;
+  drawOscilloscope(mockCanvas, {
+    dryBuffer: buf,
+    wetBuffer: buf,
+    bypass: true,
+    theme: 'dark'
+  });
+  assert.equal(strokes.includes('#38bdf8'), true);
+});
+
+test('createAudioStudio runs singleton DSP loop, crossfades stage and variant swaps, handles pluck/visibility, supports bypass, and stops cleanly', async () => {
+  let onaudioprocess = null;
+  let instanceCount = 0;
+  const winListeners = new Map();
+  const docListeners = new Map();
+
+  class MockAudioContext {
+    constructor() {
+      instanceCount++;
+      this.sampleRate = 48000;
+      this.state = 'suspended';
+      this.destination = {};
+    }
+    async resume() {
+      this.state = 'running';
+    }
+    createConstantSource() {
+      return { offset: { value: 0 }, connect() {}, start() {}, disconnect() {} };
+    }
+    createGain() {
+      return { gain: { value: 1 }, connect() {}, disconnect() {} };
+    }
+    createScriptProcessor(bufSize) {
+      const node = {
+        bufferSize: bufSize,
+        connect() {},
+        disconnect() {},
+        set onaudioprocess(fn) {
+          onaudioprocess = fn;
+        },
+        get onaudioprocess() {
+          return onaudioprocess;
+        }
+      };
+      return node;
+    }
+  }
+
+  const mockDoc = {
+    visibilityState: 'visible',
+    addEventListener(t, fn) {
+      docListeners.set(t, fn);
+    },
+    removeEventListener(t, fn) {
+      if (docListeners.get(t) === fn) docListeners.delete(t);
+    }
+  };
+  const mockWin = {
+    addEventListener(t, fn) {
+      winListeners.set(t, fn);
+    },
+    removeEventListener(t, fn) {
+      if (winListeners.get(t) === fn) winListeners.delete(t);
+    },
+    requestAnimationFrame: () => 1,
+    cancelAnimationFrame() {}
+  };
+
+  const studio = createAudioStudio({
+    AudioContextClass: MockAudioContext,
+    win: mockWin,
+    doc: mockDoc
+  });
+
+  studio.attachStage(ORDERED_STAGES[0], {});
+  assert.equal(instanceCount, 0, 'AudioContext must be created lazily on play/pluck');
+
+  const playPromise = studio.play();
+  assert.equal(studio.getState().playing, true, 'playing must flip synchronously before resume settles');
+  await playPromise;
+  assert.equal(instanceCount, 1);
+
+  const outBuf = new Float32Array(1024);
+  onaudioprocess({ outputBuffer: { getChannelData: () => outBuf } });
+  let energy = 0;
+  for (const s of outBuf) energy += s * s;
+  assert.equal(energy > 0.001, true, 'expected non-silent wet output');
+
+  studio.setKnob('volume', 0.9);
+  assert.equal(studio.getState().knobs.volume, 0.9);
+  studio.setRiff('slap');
+  assert.equal(studio.getState().riffId, 'slap');
+
+  studio.updateVariant({ presetId: 'pnp_2n3906', modeId: 'hard_clip' });
+  const variantBuf = new Float32Array(1024);
+  onaudioprocess({ outputBuffer: { getChannelData: () => variantBuf } });
+  assert.equal(variantBuf.every((v) => Number.isFinite(v)), true);
+
+  studio.attachStage(ORDERED_STAGES[2], {});
+  assert.equal(instanceCount, 1, 'must reuse singleton AudioContext across stage swaps');
+  const swapBuf = new Float32Array(1024);
+  onaudioprocess({ outputBuffer: { getChannelData: () => swapBuf } });
+  assert.equal(swapBuf.every((v) => Number.isFinite(v)), true);
+
+  studio.setBypass(true);
+  assert.equal(studio.getState().bypass, true);
+  studio.toggleBypass();
+  assert.equal(studio.getState().bypass, false);
+
+  await studio.triggerPluck();
+  assert.equal(studio.getState().playing, true);
+  assert.equal(studio.getState().oneShotMode, true);
+
+  mockDoc.visibilityState = 'hidden';
+  docListeners.get('visibilitychange')();
+  assert.equal(studio.getState().playing, false, 'visibilitychange hidden must stop playback');
+
+  mockDoc.visibilityState = 'visible';
+  await studio.play();
+  assert.equal(studio.getState().playing, true);
+
+  studio.stop();
+  assert.equal(studio.getState().playing, false);
+  const silentBuf = new Float32Array(1024).fill(1);
+  onaudioprocess({ outputBuffer: { getChannelData: () => silentBuf } });
+  assert.equal(silentBuf.every((v) => v === 0), true);
+
+  studio.destroy();
+  assert.equal(docListeners.size, 0);
+  assert.equal(winListeners.size, 0);
+});
