@@ -8,7 +8,13 @@ import {
   getStageDefaultParts,
   getDiffAgainstPrevious
 } from '../site/js/data/stages/index.js';
-import { validateStageParts, computeBreadboardDiff } from '../site/js/breadboard-diff.js';
+import {
+  validateStageParts,
+  traceConnectedNet,
+  computeBreadboardDiff
+} from '../site/js/breadboard-diff.js';
+
+const SERIES_AUDIO_COUPLING_CAPS = ['C1', 'C_DRV_IN', 'C_INTER', 'C_TO_EQ', 'C_OUT'];
 
 test('all 7 stages validate cleanly with zero breadboard hole collisions across every preset and mode', () => {
   assert.deepEqual(
@@ -49,6 +55,43 @@ test('all 7 stages validate cleanly with zero breadboard hole collisions across 
           if (p.type === 'ecap') {
             assert.equal(typeof p.plusAt === 'string' && p.plusAt.length > 0, true, `Stage ${stage.slug} ${p.id} missing plusAt`);
           }
+        }
+
+        const plusNet = traceConnectedNet(parts, 'TOP_PLUS_2');
+        assert.equal(
+          plusNet.strips.has('HDR_GND'),
+          false,
+          `Stage ${stage.slug} (${preset.id}/${mode.id}) shorts TOP_PLUS_2 to HDR_GND`
+        );
+        assert.equal(
+          plusNet.strips.has('TOP_MINUS'),
+          false,
+          `Stage ${stage.slug} (${preset.id}/${mode.id}) shorts TOP_PLUS_2 to TOP_MINUS`
+        );
+        assert.equal(
+          plusNet.pins.has('TOP_MINUS_1'),
+          false,
+          `Stage ${stage.slug} (${preset.id}/${mode.id}) shorts TOP_PLUS_2 to TOP_MINUS_1`
+        );
+
+        const gndNet = traceConnectedNet(parts, 'HDR_GND');
+        assert.equal(
+          gndNet.strips.has('TOP_PLUS'),
+          false,
+          `Stage ${stage.slug} (${preset.id}/${mode.id}) shorts HDR_GND to TOP_PLUS`
+        );
+
+        for (const capId of SERIES_AUDIO_COUPLING_CAPS) {
+          assert.equal(
+            plusNet.partIds.has(capId),
+            false,
+            `Stage ${stage.slug} (${preset.id}/${mode.id}) shorts series audio cap ${capId} to TOP_PLUS_2`
+          );
+          assert.equal(
+            gndNet.partIds.has(capId),
+            false,
+            `Stage ${stage.slug} (${preset.id}/${mode.id}) shorts series audio cap ${capId} to HDR_GND`
+          );
         }
       }
     }

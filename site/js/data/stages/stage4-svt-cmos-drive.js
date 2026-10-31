@@ -335,10 +335,10 @@ function buildComponents(presetInput) {
       name: 'C2 (To Gate 1)',
       value: '220nF Film',
       from: 'E6',
-      to: 'E8',
+      to: 'E4',
       color: '#a855f7',
       net: 'Drive Coupling',
-      notes: 'Couples buffered bass out of Q1 Emitter.'
+      notes: 'Exact 2-row box cap coupling buffered bass out of Q1 Emitter into Row 4 Top.'
     },
     {
       id: 'R_IN1',
@@ -346,10 +346,11 @@ function buildComponents(presetInput) {
       type: 'resistor',
       name: 'R_IN1',
       value: '33k ohm',
-      from: 'D8',
+      from: 'D4',
       to: 'H12',
       net: 'Gate 1 Input (Pin 3)',
-      notes: 'Feeds Gate 1 Input (Row 12 Bottom), setting max gain to ~16x with 500k DRIVE pot.'
+      notes:
+        'Feeds Gate 1 Input (Row 12 Bottom) from Row 4 Top, setting max gain to ~16x with 500k DRIVE pot.'
     },
     {
       id: 'C_HF1',
