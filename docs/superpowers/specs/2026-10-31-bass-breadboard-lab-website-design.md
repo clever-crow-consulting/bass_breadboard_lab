@@ -59,10 +59,15 @@ bass_breadboard_lab__worktrees/main/
 					stage5a-vactrol-filter.js
 					stage5b-optical-compressor.js
 					stage6-cd4013-sub-octave.js
+					index.js
 	tests/
+		check-site.test.mjs
+		store-and-bom.test.mjs
+		stages-1-to-3.test.mjs
 		netlist-and-diff.test.mjs
 		audio-dsp.test.mjs
-		store-and-bom.test.mjs
+		render-and-audio-studio.test.mjs
+		workbench-integration.test.mjs
 ```
 
 The `justfile` uses big-endian recipe names prefixed with `site-` so related commands group together in `just --list`:
@@ -145,11 +150,11 @@ export const stageDescriptor = {
 };
 ```
 
-Every part returned by `buildComponents` uses canonical pin identifiers:
+Every part returned by `buildComponents` supplies pins via either `pins: [...]` for multi-pin parts or `{ from, to }` for two-lead parts, normalized by `getPartPins(part)` into canonical pin identifiers:
 
 - Breadboard holes: `A1` through `E30` and `F1` through `J30`.
-- Power bus rails: `RAIL_POS_L:<row>`, `RAIL_GND_L:<row>`, `RAIL_POS_R:<row>`, and `RAIL_GND_R:<row>`.
-- Coppersound header sockets: `HDR_IN`, `HDR_OUT`, `HDR_9V`, `HDR_GND`, and `HDR_P1_1` through `HDR_P3_3`.
+- Power bus rails: `TOP_PLUS_1` through `TOP_PLUS_30`, `TOP_MINUS_1` through `TOP_MINUS_30`, `BOT_PLUS_1` through `BOT_PLUS_30`, and `BOT_MINUS_1` through `BOT_MINUS_30`.
+- Coppersound header sockets: `HDR_IN`, `HDR_OUT`, `HDR_9V`, and `HDR_GND`.
 
 Within any single preset and mode combination, no two component leads occupy the same breadboard hole `A1` through `J30`.
 
@@ -157,7 +162,7 @@ Within any single preset and mode combination, no two component leads occupy the
 
 Each stage sets `previousStageSlug` to `null` for Stage 1, `'1'` for Stage 2, `'2'` for Stage 3, `'3'` for Stage 4, `'4'` for Stage 5A, `'5a'` for Stage 5B, and `'5b'` for Stage 6. Comparing the default preset of the previous stage against the active preset and mode of the current stage in `site/js/breadboard-diff.js` classifies components deterministically:
 
-1. **`unchanged`**: The same `id` exists in the previous stage with identical `type`, normalized `value`, and identical ordered `pins`. For example, the Row 1 to 4 `100 ohm` plus `100uF` RC hum filter remains unchanged across all seven stages, and Rows 1 to 15 remain unchanged when moving from Stage 5A to Stage 5B.
+1. **`unchanged`**: The same `id` exists in the previous stage with identical `type`, normalized `value`, and identical ordered `pins`. For example, the Row 1 to 4 `100 ohm` plus `100uF` RC hum filter (`J_GND_HDR`, `J_GND_BRIDGE`, `J_9V_HDR`, `R_PWR`, `C_PWR`) remains unchanged across all seven stages, and Rows 1 to 15 (`R_V1`, `R_V2`, `C_VREF`, `J_VREF_LINK`, `IC1`, `J_IC_VCC`, `J_IC_GND`, `J_IN`, `R_PD`, `C1`, `J_IN_PIN3`, `R_BIAS`) remain unchanged when moving from Stage 5A to Stage 5B.
 2. **`modified`**: The same `id` exists in the previous stage, and either `value` or `pins` changed. The diff entry records `fromPins`, `toPins`, `fromValue`, and `toValue`.
 3. **`added`**: The `id` exists in the current stage and does not exist in the previous stage.
 4. **`removed`**: The `id` exists in the previous stage and does not exist in the current stage.
@@ -195,7 +200,7 @@ Clicking or hovering any component or breadboard row highlights all electrically
 	"preferredRiffId": "groove",
 	"bomOwnedIds": ["semi_mpsa13", "cap_470nf"],
 	"stagePartChecks": {
-		"1": ["R_HUM", "C_HUM", "C1"]
+		"1": ["R_PWR", "C_PWR", "C1"]
 	},
 	"completedStages": ["1"]
 }
