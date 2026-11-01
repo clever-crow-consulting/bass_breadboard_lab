@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPassiveBassRiffs } from '../site/js/riffs.js';
+import { applyStudioAmpGain } from '../site/js/audio-studio.js';
 import { ORDERED_STAGES, STAGES_BY_SLUG } from '../site/js/data/stages/index.js';
 
 function defaultKnobs(stage) {
@@ -11,6 +12,47 @@ function rms(arr, start = 0, end = arr.length) {
   let sum = 0;
   for (let i = start; i < end; i++) sum += arr[i] * arr[i];
   return Math.sqrt(sum / Math.max(1, end - start));
+}
+
+function measureKWeightedLufs(buf) {
+  // ITU-R BS.1770-4 K-weighting biquad cascade at 48 kHz
+  const b1_0 = 1.53512485958697;
+  const b1_1 = -2.69169618940638;
+  const b1_2 = 1.19839281085285;
+  const a1_1 = -1.69065929318241;
+  const a1_2 = 0.73248077421585;
+  const b2_0 = 1.0;
+  const b2_1 = -2.0;
+  const b2_2 = 1.0;
+  const a2_1 = -1.99004745483398;
+  const a2_2 = 0.99007225036621;
+
+  let x1_1 = 0;
+  let x1_2 = 0;
+  let y1_1 = 0;
+  let y1_2 = 0;
+  let x2_1 = 0;
+  let x2_2 = 0;
+  let y2_1 = 0;
+  let y2_2 = 0;
+  let sumK = 0;
+
+  for (let i = 0; i < buf.length; i++) {
+    const x = buf[i];
+    const y1 = b1_0 * x + b1_1 * x1_1 + b1_2 * x1_2 - a1_1 * y1_1 - a1_2 * y1_2;
+    x1_2 = x1_1;
+    x1_1 = x;
+    y1_2 = y1_1;
+    y1_1 = y1;
+    const y2 = b2_0 * y1 + b2_1 * x2_1 + b2_2 * x2_2 - a2_1 * y2_1 - a2_2 * y2_2;
+    x2_2 = x2_1;
+    x2_1 = y1;
+    y2_2 = y2_1;
+    y2_1 = y2;
+    sumK += y2 * y2;
+  }
+
+  return -0.691 + 10 * Math.log10(Math.max(1e-12, sumK / Math.max(1, buf.length)));
 }
 
 function countRisingZeroCrossings(arr, start, end) {
@@ -158,4 +200,66 @@ test('Stage 6 CD4013 divider halves frequency for -1 octave and quarters frequen
     true,
     `oct2 crossings=${oct2Crossings}`
   );
+});
+
+test('all 7 stages match dry true-bypass loudness within 1.2 LU at defaults and keep dry/wet blend pots balanced', () => {
+  const fs = 48000;
+  const riffs = createPassiveBassRiffs(fs);
+
+  const runStagePost = (stage, src, knobOverrides = {}) => {
+    const knobs = { ...defaultKnobs(stage), ...knobOverrides };
+    const state = {
+      presetId: stage.defaultPresetId,
+      modeId: stage.defaultModeId,
+      knobs
+    };
+    const dsp = stage.audioSpec.createDSP(fs, () => state);
+    const out = new Float32Array(src.length);
+    for (let i = 0; i < src.length; i++) {
+      out[i] = applyStudioAmpGain(dsp.processSample(src[i]));
+    }
+    return out;
+  };
+
+  for (const stage of ORDERED_STAGES) {
+    const riffId = stage.audioSpec.defaultRiffId || 'groove';
+    const src = riffs[riffId];
+    const dryPost = Float32Array.from(src, applyStudioAmpGain);
+    const dryLufs = measureKWeightedLufs(dryPost);
+
+    const wetDefault = runStagePost(stage, src);
+    const wetLufs = measureKWeightedLufs(wetDefault);
+    const deltaLu = wetLufs - dryLufs;
+
+    assert.equal(
+      Math.abs(deltaLu) <= 1.2,
+      true,
+      `Stage ${stage.slug} (${riffId}) default wet loudness ${wetLufs.toFixed(2)} LUFS differs from dry bypass ${dryLufs.toFixed(2)} LUFS by ${deltaLu.toFixed(2)} LU`
+    );
+
+    const wetFullVol = runStagePost(stage, src, { volume: 1.0 });
+    const fullVolLufs = measureKWeightedLufs(wetFullVol);
+    assert.equal(
+      fullVolLufs - wetLufs >= 2.0,
+      true,
+      `Stage ${stage.slug} expected >= +2.0 LU boost headroom at 100% volume, got ${(fullVolLufs - wetLufs).toFixed(2)} LU`
+    );
+  }
+
+  for (const [slug, riffId, dryKnob, wetKnob] of [
+    ['3', 'groove', { blend: 0.0 }, { blend: 1.0 }],
+    ['5a', 'slap', { mix: 0.0 }, { mix: 1.0 }],
+    ['6', 'upperSynth', { mix: 1.0 }, { mix: 0.0 }]
+  ]) {
+    const stage = STAGES_BY_SLUG[slug];
+    const src = riffs[riffId];
+    const cleanEndLufs = measureKWeightedLufs(runStagePost(stage, src, dryKnob));
+    const wetEndLufs = measureKWeightedLufs(runStagePost(stage, src, wetKnob));
+    const gapLu = Math.abs(wetEndLufs - cleanEndLufs);
+    assert.equal(
+      gapLu <= 1.8,
+      true,
+      `Stage ${slug} dry vs wet blend endpoints differ by ${gapLu.toFixed(2)} LU (expected <= 1.8 LU)`
+    );
+  }
 });

@@ -832,7 +832,7 @@ function createDSP(sampleRate, getState) {
       drive: knobs.drive ?? 0.58,
       bass: knobs.bass ?? 0.64,
       treble: knobs.treble ?? 0.6,
-      vol: knobs.volume ?? knobs.vol ?? 0.76
+      vol: knobs.volume ?? knobs.vol ?? 0.72
     };
   }
 
@@ -883,7 +883,7 @@ function createDSP(sampleRate, getState) {
       }
 
       const volTaper = Math.pow(st.vol, 1.6);
-      return Math.tanh(y * volTaper * 0.85) * 0.85;
+      return Math.tanh(y * volTaper * 0.52) * 0.75;
     }
   };
 }
@@ -941,7 +941,7 @@ export const stageDescriptor = {
         min: 0.0,
         max: 1.0,
         step: 0.01,
-        val: 0.76,
+        val: 0.72,
         fmt: 'pct'
       }
     ],

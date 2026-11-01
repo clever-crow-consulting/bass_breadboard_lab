@@ -647,7 +647,7 @@ function createDSP(sampleRate, getState) {
     return {
       presetId: raw.presetId || 'studio_glue',
       comp: knobs.comp ?? 0.72,
-      vol: knobs.volume ?? knobs.vol ?? 0.84
+      vol: knobs.volume ?? knobs.vol ?? 0.78
     };
   }
 
@@ -694,8 +694,8 @@ function createDSP(sampleRate, getState) {
       }
 
       const volTaper = Math.pow(st.vol, 1.6);
-      const makeup = 1 + 0.38 * st.comp;
-      return Math.tanh(y * volTaper * makeup * 1.45) * 0.90;
+      const makeup = 1 + 0.42 * st.comp;
+      return Math.tanh(y * volTaper * makeup * 2.45) * 0.9;
     }
   };
 }
@@ -735,7 +735,7 @@ export const stageDescriptor = {
         min: 0.0,
         max: 1.0,
         step: 0.01,
-        val: 0.84,
+        val: 0.78,
         fmt: 'pct'
       }
     ],

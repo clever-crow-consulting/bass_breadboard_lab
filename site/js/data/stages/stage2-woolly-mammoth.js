@@ -667,7 +667,7 @@ function createDSP(sampleRate, getState) {
       modeId: raw.modeId || 'max_wool',
       pinch: knobs.pinch ?? 0.45,
       eq: knobs.eq ?? 0.48,
-      vol: knobs.volume ?? knobs.vol ?? 0.78
+      vol: knobs.volume ?? knobs.vol ?? 0.72
     };
   }
 
@@ -680,7 +680,7 @@ function createDSP(sampleRate, getState) {
     processSample(x) {
       const st = readState();
       let y = 0;
-      const pad = st.presetId === 'npn_active' ? 0.55 : 1.0;
+      const pad = st.presetId === 'npn_active' ? 0.86 : 1.0;
       const q2Gain = st.modeId === 'max_wool' ? 20.0 : 5.5;
       const pol = st.presetId === 'pnp_flip' ? -1 : 1;
 
@@ -727,7 +727,7 @@ function createDSP(sampleRate, getState) {
         y = outAc;
       }
       const volTaper = Math.pow(st.vol, 1.6);
-      return Math.tanh(y * volTaper * 0.78) * 0.85;
+      return Math.tanh(y * volTaper * 0.62) * 0.76;
     }
   };
 }
@@ -776,7 +776,7 @@ export const stageDescriptor = {
         min: 0.0,
         max: 1.0,
         step: 0.01,
-        val: 0.78,
+        val: 0.72,
         fmt: 'pct'
       }
     ],

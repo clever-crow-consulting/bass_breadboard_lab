@@ -705,7 +705,7 @@ function createDSP(sampleRate, getState) {
       presetId: raw.presetId || 'sub_quack',
       sens: knobs.sens ?? 0.76,
       mix: knobs.mix ?? 0.68,
-      vol: knobs.volume ?? knobs.vol ?? 0.82
+      vol: knobs.volume ?? knobs.vol ?? 0.78
     };
   }
 
@@ -744,16 +744,17 @@ function createDSP(sampleRate, getState) {
         const hp = dry - lp - qDamp * bp;
         bp += fCoeff * hp;
         lp += fCoeff * bp;
-        const funkOut = (bp / qVal) * 4.6;
+        const funkScale = st.presetId === 'slap_funk' ? 4.3 : 6.4;
+        const funkOut = (bp / qVal) * funkScale;
 
-        const mixed = dry * (1 - st.mix) * 1.65 + funkOut * st.mix * 1.75;
+        const mixed = dry * (1 - st.mix) * 1.32 + funkOut * st.mix * 1.8;
         const outAc = mixed - hpOut;
         hpOut += aHpOut * (mixed - hpOut);
         y = outAc;
       }
 
       const volTaper = Math.pow(st.vol, 1.6);
-      return Math.tanh(y * volTaper * 1.35) * 0.85;
+      return Math.tanh(y * volTaper * 1.56) * 0.88;
     }
   };
 }
@@ -802,7 +803,7 @@ export const stageDescriptor = {
         min: 0.0,
         max: 1.0,
         step: 0.01,
-        val: 0.82,
+        val: 0.78,
         fmt: 'pct'
       }
     ],

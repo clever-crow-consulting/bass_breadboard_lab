@@ -899,7 +899,7 @@ function createDSP(sampleRate, getState) {
     return {
       presetId: raw.presetId || 'oct1_warm',
       mix: knobs.mix ?? 0.35,
-      vol: knobs.volume ?? knobs.vol ?? 0.8
+      vol: knobs.volume ?? knobs.vol ?? 0.75
     };
   }
 
@@ -915,6 +915,8 @@ function createDSP(sampleRate, getState) {
       let y = 0;
       const trkCut = st.presetId === 'oct2_deep' ? 68 : 115;
       const aTrk = onePoleAlpha(trkCut, fs2);
+      const wSub = Math.cos(st.mix * Math.PI * 0.5);
+      const wClean = Math.sin(st.mix * Math.PI * 0.5);
 
       for (let os = 0; os < 2; os++) {
         const clean = x - hpIn;
@@ -940,27 +942,27 @@ function createDSP(sampleRate, getState) {
 
         const rawBit = (st.presetId === 'oct2_deep' ? ff2Q : ff1Q) ? 1.0 : -1.0;
         const envGate = Math.min(1, Math.max(0, (envTrack - 0.004) / 0.025));
-        let subSig = rawBit * Math.min(0.68, envTrack * 1.55) * envGate;
+        let subSig = rawBit * Math.min(0.25, envTrack * 0.56) * envGate;
 
         if (st.presetId !== 'oct1_synth_sq') {
           subLp1 += aSubLp * (subSig - subLp1);
           subLp2 += aSubLp * (subLp1 - subLp2);
-          subSig = subLp2 * 1.65;
+          subSig = subLp2 * 1.56;
         } else {
-          subSig *= 0.78;
+          subSig *= 0.94;
         }
 
         const subAc = subSig - subAcHp;
         subAcHp += aSubHp * (subSig - subAcHp);
 
-        const mixed = subAc * (1 - st.mix) * 1.38 + clean * st.mix * 1.25;
+        const mixed = subAc * wSub * 1.22 + clean * wClean * 1.26;
         const outAc = mixed - hpOut;
         hpOut += aHpOut * (mixed - hpOut);
         y = outAc;
       }
 
       const volTaper = Math.pow(st.vol, 1.6);
-      return Math.tanh(y * volTaper * 1.35) * 0.85;
+      return Math.tanh(y * volTaper * 1.55) * 0.84;
     }
   };
 }
@@ -1001,7 +1003,7 @@ export const stageDescriptor = {
         min: 0.0,
         max: 1.0,
         step: 0.01,
-        val: 0.8,
+        val: 0.75,
         fmt: 'pct'
       }
     ],

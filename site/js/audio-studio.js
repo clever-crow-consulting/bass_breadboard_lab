@@ -3,6 +3,22 @@ import { createPassiveBassRiffs } from './riffs.js';
 const VALID_RIFF_IDS = new Set(['groove', 'slap', 'sustain', 'upperSynth']);
 const SCOPE_RING_SIZE = 512;
 const SCOPE_RING_MASK = SCOPE_RING_SIZE - 1;
+const STUDIO_AMP_GAIN = 1.48;
+const STUDIO_AMP_KNEE_START = 0.78;
+const STUDIO_AMP_KNEE_WIDTH = 0.18;
+
+export function applyStudioAmpGain(sample) {
+  const s = (Number(sample) || 0) * STUDIO_AMP_GAIN;
+  const abs = Math.abs(s);
+  if (abs <= STUDIO_AMP_KNEE_START) {
+    return s;
+  }
+  return (
+    Math.sign(s) *
+    (STUDIO_AMP_KNEE_START +
+      STUDIO_AMP_KNEE_WIDTH * Math.tanh((abs - STUDIO_AMP_KNEE_START) / STUDIO_AMP_KNEE_WIDTH))
+  );
+}
 
 export function formatKnobValue(knobDef, value) {
   const v = Number(value ?? knobDef?.val ?? 0);
@@ -300,7 +316,7 @@ export function createAudioStudio({
 
       processor = ctx.createScriptProcessor(1024, 1, 1);
       masterGain = ctx.createGain();
-      masterGain.gain.value = 0.88;
+      masterGain.gain.value = 0.92;
 
       if (typeof ctx.createConstantSource === 'function') {
         sourceKeepAlive = ctx.createConstantSource();
@@ -350,12 +366,14 @@ export function createAudioStudio({
           }
 
           bypassSmooth += 0.004 * (targetBypass - bypassSmooth);
-          const sample = wet * (1 - bypassSmooth) + dry * 0.92 * bypassSmooth;
-          out[i] = Number.isFinite(sample) ? sample : 0;
+          const pedalOut = wet * (1 - bypassSmooth) + dry * bypassSmooth;
+          const safePedalOut = Number.isFinite(pedalOut) ? pedalOut : 0;
+          const ampSample = applyStudioAmpGain(safePedalOut);
+          out[i] = Number.isFinite(ampSample) ? ampSample : 0;
 
           const sw = scopeWrite;
           scopeDry[sw] = dry;
-          scopeWet[sw] = out[i];
+          scopeWet[sw] = safePedalOut;
           scopeWrite = (sw + 1) & SCOPE_RING_MASK;
         }
       };

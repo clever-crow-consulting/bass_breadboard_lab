@@ -556,7 +556,7 @@ function createDSP(sampleRate, getState) {
       modeId: raw.modeId || 'stock',
       guitarVol: knobs.guitarVol ?? 1.0,
       ledMod: knobs.ledMod ?? 1,
-      vol: knobs.volume ?? knobs.vol ?? 0.78
+      vol: knobs.volume ?? knobs.vol ?? 0.7
     };
   }
 
@@ -595,7 +595,7 @@ function createDSP(sampleRate, getState) {
           lpMod += aTamer * (v - lpMod);
           v = lpMod;
         } else if (st.modeId === 'hard_clip') {
-          v = 0.62 * Math.tanh((v * 1.45) / 0.62);
+          v = 0.96 * Math.tanh((v * 1.45) / 0.96);
         }
 
         const outAc = v - hpOut;
@@ -603,7 +603,7 @@ function createDSP(sampleRate, getState) {
         y = outAc;
       }
       const volTaper = Math.pow(st.vol, 1.6);
-      return Math.tanh(y * volTaper * 0.82) * 0.85;
+      return Math.tanh(y * volTaper * 0.36) * 0.68;
     }
   };
 }
@@ -652,7 +652,7 @@ export const stageDescriptor = {
         min: 0.0,
         max: 1.0,
         step: 0.01,
-        val: 0.78,
+        val: 0.7,
         fmt: 'pct'
       }
     ],

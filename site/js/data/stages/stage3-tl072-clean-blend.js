@@ -738,7 +738,7 @@ function createDSP(sampleRate, getState) {
       presetId: raw.presetId || 'biamp_crossover',
       blend: knobs.blend ?? 0.5,
       drive: knobs.drive ?? 0.5,
-      vol: knobs.volume ?? knobs.vol ?? 0.8
+      vol: knobs.volume ?? knobs.vol ?? 0.75
     };
   }
 
@@ -753,6 +753,7 @@ function createDSP(sampleRate, getState) {
     processSample(x) {
       const st = readState();
       const drivePush = 0.5 + st.drive * 1.1;
+      const panLift = 1 + 0.16 * 4 * st.blend * (1 - st.blend);
       let y = 0;
 
       for (let os = 0; os < 2; os++) {
@@ -762,7 +763,9 @@ function createDSP(sampleRate, getState) {
         let clean = ac;
         if (st.presetId === 'biamp_crossover') {
           cleanSubLp += aSubLp * (clean - cleanSubLp);
-          clean = cleanSubLp * 1.28;
+          clean = cleanSubLp * 1.32;
+        } else if (st.presetId === 'full_blend') {
+          clean = ac * 1.12;
         }
 
         let wet;
@@ -776,17 +779,17 @@ function createDSP(sampleRate, getState) {
           const u = hp * 24.0 * drivePush;
           const clip = u >= 0 ? 1.55 * Math.tanh(u / 1.55) : 0.68 * Math.tanh(u / 0.68);
           gritLp += aGritLp * (clip - gritLp);
-          wet = ac * 0.42 + gritLp * 0.58;
+          wet = ac * 0.38 + gritLp * 0.2;
         }
 
-        const blended = clean * (1 - st.blend) + wet * st.blend;
+        const blended = (clean * (1 - st.blend) + wet * st.blend) * panLift;
         const outAc = blended - hpOut;
         hpOut += aHpOut * (blended - hpOut);
         y = outAc;
       }
 
       const volTaper = Math.pow(st.vol, 1.6);
-      return Math.tanh(y * volTaper * 1.55) * 0.85;
+      return Math.tanh(y * volTaper * 1.66) * 0.84;
     }
   };
 }
@@ -835,7 +838,7 @@ export const stageDescriptor = {
         min: 0.0,
         max: 1.0,
         step: 0.01,
-        val: 0.8,
+        val: 0.75,
         fmt: 'pct'
       }
     ],

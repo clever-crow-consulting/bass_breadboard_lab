@@ -10,8 +10,10 @@ import {
 import {
   findRisingZeroCrossing,
   drawOscilloscope,
+  applyStudioAmpGain,
   createAudioStudio
 } from '../site/js/audio-studio.js';
+import { createPassiveBassRiffs } from '../site/js/riffs.js';
 
 test('resolvePinCoord resolves holes, rails, and headers and returns null for invalid tokens', () => {
   const a1 = resolvePinCoord('A1');
@@ -400,6 +402,31 @@ test('createAudioStudio runs singleton DSP loop, crossfades stage and variant sw
 
   studio.setBypass(true);
   assert.equal(studio.getState().bypass, true);
+  studio.stop();
+  await studio.play();
+  const bypassBuf = new Float32Array(1024);
+  onaudioprocess({ outputBuffer: { getChannelData: () => bypassBuf } });
+  const expectedGroove = createPassiveBassRiffs(48000).groove;
+  for (let i = 0; i < 64; i++) {
+    assert.equal(
+      Math.abs(bypassBuf[i] - applyStudioAmpGain(expectedGroove[i])) < 1e-6,
+      true,
+      `expected 1:1 unattenuated bypass through studio amp gain at sample ${i}`
+    );
+  }
+  let rawEnergy = 0;
+  let boostedBypassEnergy = 0;
+  for (let i = 0; i < expectedGroove.length; i++) {
+    rawEnergy += expectedGroove[i] * expectedGroove[i];
+    const b = applyStudioAmpGain(expectedGroove[i]);
+    boostedBypassEnergy += b * b;
+  }
+  const boostDb = 10 * Math.log10(boostedBypassEnergy / rawEnergy);
+  assert.equal(boostDb >= 3.0, true, `expected >= +3.0 dB clean DI gain on dry bass, got ${boostDb.toFixed(2)} dB`);
+  const slapRiff = createPassiveBassRiffs(48000).slap;
+  for (let i = 0; i < slapRiff.length; i++) {
+    assert.equal(Math.abs(applyStudioAmpGain(slapRiff[i])) < 0.98, true);
+  }
   studio.toggleBypass();
   assert.equal(studio.getState().bypass, false);
 
