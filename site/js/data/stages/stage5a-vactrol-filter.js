@@ -629,6 +629,61 @@ function buildComponents(presetInput) {
   return parts.map(withPartMeta);
 }
 
+function buildWiringSteps(presetInput) {
+  const preset =
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.sub_quack;
+
+  return [
+    {
+      step: 1,
+      title: 'Supply hum filter and Row 9 +4.4V V_REF hub',
+      goal: 'Establish quiet single-supply rails and a half-supply reference shared with Stage 5B.',
+      instructions: [
+        'Keep J_GND_HDR (HDR_GND to TOP_MINUS_1), J_GND_BRIDGE (TOP_MINUS_30 to BOT_MINUS_30), J_9V_HDR (HDR_9V to C2), R_PWR (100 ohm, A2 to TOP_PLUS_2), and C_PWR (100uF, TOP_PLUS_4 to TOP_MINUS_4).',
+        'Build the Row 9 virtual ground with R_V1 (10k ohm, A9 to TOP_PLUS_9), R_V2 (10k ohm, B9 to TOP_MINUS_9), C_VREF (47uF electrolytic, + in C9, - in TOP_MINUS_8), and J_VREF_LINK (Teal Jumper, E9 to F9).'
+      ],
+      check: 'Meter +4.35V to +4.45V DC at probe point G9.'
+    },
+    {
+      step: 2,
+      title: 'TL072 placement, 1M passive preamp, and SENS control',
+      goal: 'Boost passive bass plucks up to 22x so gentle fingerstyle attacks still fire the envelope LED.',
+      instructions: [
+        'Seat IC1 (TL072) across E12-E15 and F12-F15 with the Pin 1 notch facing LEFT at Row 12; wire J_IC_VCC (A12 to TOP_PLUS_12) and J_IC_GND (J15 to BOT_MINUS_15).',
+        'Wire the passive input network: J_IN (HDR_IN to B5), R_PD (1M ohm, A5 to TOP_MINUS_5), C1 (470nF film, D5 to D7), J_IN_PIN3 (E7 to H14), and R_BIAS (1M ohm, I9 to I14).',
+        'Close Op-Amp A preamp gain with R_PRE_FB (100k ohm, G12 to G13), J_PIN1_HUB (I12 to F17), R_SENS_MIN (4.7k ohm, H13 to F6), SENS_POT (100kB at G4/G6/G8), C_SENS (220nF, I8 to I10), and J_SENS_VREF (H9 to H10).'
+      ],
+      check: 'Probe Preamp Out at G17: idle sits at +4.4V DC and jumps toward +7.8V on hard plucks.'
+    },
+    {
+      step: 3,
+      title: `1N4148 peak rectifier, ${preset.envCap} decay cap, and DIY heat-shrink vactrol`,
+      goal: `Convert pluck peaks into optical resistance sweeps (${preset.decayTime} release).`,
+      instructions: [
+        'Route V_REF to the vactrol zone with J_PIN5_VREF (Teal Jumper, D9 to D15) and J_VACTROL_VREF (Teal Jumper, B15 to B18).',
+        `Install D_RECT (1N4148, anode H12, cathode stripe E16), C_ENV (${preset.envCap}, + lead in B16, - lead in C15), and R_LED (4.7k ohm, A16 to A17).`,
+        'Insert VAC_LED (3mm Red LED, long + anode in C17, short - cathode in C18) facing VAC_LDR (GL5528 photoresistor, D18 to C21), and slip a 15mm sleeve of black heat-shrink tubing (pinched shut on top) over both.'
+      ],
+      check: 'Pluck a bass note while metering B16: DC voltage should jump from +4.4V toward +7.2V and glide smoothly back down.'
+    },
+    {
+      step: 4,
+      title: `MFB band-pass filter (2x ${preset.filterCap}), Dry Sub MIX, and Master Volume`,
+      goal: `Sweep resonant funk formants across ${preset.sweepRange} while keeping 41 Hz clean sub weight underneath.`,
+      instructions: [
+        `Wire Op-Amp B filter spurs and loop: J_OUTB_SPUR (C13 to B19), J_INB_SPUR (D14 to B23), R_MFB_IN (47k, J12 to B21), C_F2 (${preset.filterCap}, D19 to D21), C_F1 (${preset.filterCap}, E21 to E23), and R_Q (220k, A19 to A23).`,
+        'Blend clean sub and resonant quack with R_DRY_MIX (33k, J17 to F19), R_WET_MIX (15k, E19 to F23), MIX_POT (100kB at G19/G21/G23), and J_MIX_TAP (H21 to C25).',
+        'Couple out through C_OUT (470nF, D25 to D27) and J_VOL_IN (E27 to F26) into VOL_POT (100kA at G26/G28/G30) with J_VOL_GND (I30 to BOT_MINUS_28) and J_OUT (F28 to HDR_OUT).'
+      ],
+      check: 'Probe Filter Out Pin 7 at B13 for +4.4V DC idle and sweep SENS and MIX while slapping open E1.'
+    }
+  ];
+}
+
 function createDSP(sampleRate, getState) {
   const fs2 = sampleRate * 2;
   let hpIn = 0;
@@ -717,6 +772,7 @@ export const stageDescriptor = {
   presets: PRESETS,
   modes: MODES,
   buildComponents,
+  buildWiringSteps,
   audioSpec: {
     defaultRiffId: 'slap',
     hint:

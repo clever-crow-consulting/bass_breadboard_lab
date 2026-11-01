@@ -38,6 +38,15 @@ export function getStageDefaultParts(slug) {
   return getStageParts(stage.slug, stage.defaultPresetId, stage.defaultModeId);
 }
 
+export function getStageWiringSteps(slug, presetId, modeId) {
+  const stage = getStage(slug);
+  if (!stage || typeof stage.buildWiringSteps !== 'function') return [];
+  const preset =
+    getOwnProp(stage.presets, presetId) || getOwnProp(stage.presets, stage.defaultPresetId);
+  const mode = getOwnProp(stage.modes, modeId) || getOwnProp(stage.modes, stage.defaultModeId);
+  return stage.buildWiringSteps(preset, mode);
+}
+
 export function getDiffAgainstPrevious(slug, presetId, modeId) {
   const stage = getStage(slug);
   if (!stage || !stage.previousStageSlug) {

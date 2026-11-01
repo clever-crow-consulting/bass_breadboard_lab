@@ -596,6 +596,13 @@ test('home, BOM, and stage transition markup builders render complete accessible
   assert.match(homeHtml, /Stage 3/);
   assert.match(homeHtml, /2 of 7 stages completed/);
   assert.match(homeHtml, /470nF/);
+  assert.match(homeHtml, /What you learn/);
+  assert.match(homeHtml, /Step-by-step wiring \+ live audio inside/);
+  assert.doesNotMatch(homeHtml, /Holes A1 to J30/);
+  assert.doesNotMatch(homeHtml, /Keep your Row 1 to 4 9V RC hum filter installed/);
+  assert.doesNotMatch(homeHtml, /pull D1/i);
+  assert.doesNotMatch(homeHtml, /Rows 13 to 16/i);
+  assert.doesNotMatch(homeHtml, /Rows 1 to 15/i);
 
   const allCompleteHomeHtml = buildHomeMarkup({
     state: {
@@ -840,11 +847,26 @@ test('mountStageView updates presets, modes, diff checklist, inspector, knobs, a
   assert.equal(s1DiffBtn.disabled, true);
   assert.match(appRoot.innerHTML, /Stage 1 is the initial baseline layout/);
 
+  const fullStage1Markup = appRoot.innerHTML;
+  const wiringRegionIdx = fullStage1Markup.indexOf('data-region="wiring-checklist"');
+  const studioRegionIdx = fullStage1Markup.indexOf('data-region="audio-studio"');
+  assert.equal(wiringRegionIdx > 0 && studioRegionIdx > wiringRegionIdx, true, 'step-by-step wiring panel should appear directly below the breadboard bench before audio studio');
+  assert.equal(appRoot.querySelectorAll('[data-wiring-step]').length, 5, 'Stage 1 should render 5 ordered build steps');
+  assert.match(appRoot.querySelector('[data-region="wiring-checklist"]').innerHTML, /Step-by-step breadboard wiring/);
+  assert.match(appRoot.querySelector('[data-region="wiring-checklist"]').innerHTML, /TOP_MINUS_12/);
+
+  const gePresetBtn = appRoot.querySelector('[data-action="select-preset"][data-preset-id="pnp_ac128"]');
+  assert.ok(gePresetBtn);
+  gePresetBtn.click();
+  assert.match(appRoot.querySelector('[data-region="wiring-checklist"]').innerHTML, /R_LEAK/);
+  assert.match(appRoot.querySelector('[data-region="wiring-checklist"]').innerHTML, /TOP_PLUS_12/);
+
   const modeBtn = appRoot.querySelector('[data-action="select-mode"][data-mode-id="hard_clip"]');
   assert.ok(modeBtn, 'Stage 1 should render Mode selector buttons');
   modeBtn.click();
   assert.equal(audioStudio.getState().modeId, 'hard_clip');
   assert.match(appRoot.innerHTML, /data-part-id="D_CLIP"/);
+  assert.match(appRoot.querySelector('[data-region="wiring-checklist"]').innerHTML, /D_CLIP/);
 
   cleanupStage1();
 
@@ -923,6 +945,18 @@ test('mountStageView updates presets, modes, diff checklist, inspector, knobs, a
   partCheck.click();
   assert.equal(store.isPartChecked('5b', 'VAC_LDR'), true);
   assert.match(appRoot.querySelector('[data-region="breadboard-canvas"]').innerHTML, /data-checked="true"/);
+
+  const step2FocusBtn = appRoot.querySelector('[data-action="focus-wiring-step"][data-step="2"]');
+  assert.ok(step2FocusBtn, 'expected focus-wiring-step button for Step 2');
+  step2FocusBtn.click();
+  assert.match(appRoot.querySelector('[data-region="breadboard-canvas"]').innerHTML, /data-step-dimmed="true"/);
+  assert.equal(appRoot.querySelector('canvas[data-role="scope-canvas"]'), canvasBefore, 'step focus must not replace scope canvas');
+  assert.equal(appRoot.querySelector('input[data-action="studio-knob"]'), firstSliderBefore, 'step focus must not replace range sliders');
+
+  const showAllStepsBtn = appRoot.querySelector('[data-action="focus-wiring-step"][data-step="all"]');
+  assert.ok(showAllStepsBtn, 'expected All steps button');
+  showAllStepsBtn.click();
+  assert.doesNotMatch(appRoot.querySelector('[data-region="breadboard-canvas"]').innerHTML, /data-step-dimmed="true"/);
 
   appRoot.querySelector('[data-action="reset-stage-checks"]').click();
   assert.equal(store.isPartChecked('5b', 'VAC_LDR'), false);

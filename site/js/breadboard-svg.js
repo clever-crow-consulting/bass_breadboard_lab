@@ -426,6 +426,7 @@ export function renderBreadboardSvg({
   highlightedNet = null,
   diffResult = null,
   diffEnabled = false,
+  focusedStepNumber = null,
   checkedPartIds = new Set(),
   theme = 'dark'
 } = {}) {
@@ -559,6 +560,10 @@ export function renderBreadboardSvg({
     const isChecked = checkedSet.has(part.id);
     const diffActive = Boolean(diffEnabled && diffResult);
     const diffStatus = diffActive ? resolveDiffStatus(diffResult, part.id) : 'normal';
+    const stepFilterActive =
+      Number.isInteger(focusedStepNumber) && focusedStepNumber > 0 && !diffActive;
+    const stepDimmed =
+      stepFilterActive && part.stage !== focusedStepNumber && !isSelected;
 
     let opacityAttr = '';
     if (diffActive) {
@@ -572,6 +577,8 @@ export function renderBreadboardSvg({
       !isSelected
     ) {
       opacityAttr = ' opacity="0.38"';
+    } else if (stepDimmed) {
+      opacityAttr = ' opacity="0.22"';
     }
 
     const classes = ['bb-part'];
@@ -580,7 +587,8 @@ export function renderBreadboardSvg({
     if (diffActive) classes.push(`diff-${diffStatus}`);
 
     const checkedAttr = isChecked ? ' data-checked="true"' : '';
-    out += `<g class="${classes.join(' ')}" data-part-id="${escapeXml(part.id)}" data-diff-status="${escapeXml(diffStatus)}"${opacityAttr}${checkedAttr}>`;
+    const stepDimmedAttr = stepDimmed ? ' data-step-dimmed="true"' : '';
+    out += `<g class="${classes.join(' ')}" data-part-id="${escapeXml(part.id)}" data-diff-status="${escapeXml(diffStatus)}"${opacityAttr}${checkedAttr}${stepDimmedAttr}>`;
 
     if (diffActive && diffStatus === 'added') {
       out += renderPartHalo(part, {

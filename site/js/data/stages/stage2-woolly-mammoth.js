@@ -559,6 +559,93 @@ function buildComponents(presetInput, modeInput) {
   return parts.map(withPartMeta);
 }
 
+function buildWiringSteps(presetInput, modeInput) {
+  const preset =
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.npn_passive;
+  const woolMode =
+    (typeof modeInput === 'string'
+      ? Object.hasOwn(MODES, modeInput)
+        ? MODES[modeInput]
+        : null
+      : modeInput) || MODES.max_wool;
+  const pnp = preset.isPNP;
+
+  const step2InputLine = preset.useActivePad
+    ? 'Run J_IN (Green Jumper) from HDR_IN to B5 and insert R_PAD (47k ohm) from D5 to B7 to simulate passive pickup impedance for active basses.'
+    : 'Run J_IN (Green Jumper) from HDR_IN directly to B7 for passive P-Bass or J-Bass pickups.';
+
+  const cWoolLine = pnp
+    ? 'Bridge C_WOOL (22uF electrolytic) across the ravine from E18 to F18 with (+) in F18 and (-) stripe in E18, then connect R_WOOL (' +
+      woolMode.rVal +
+      ') from H18 to BOT_PLUS_18.'
+    : 'Bridge C_WOOL (22uF electrolytic) across the ravine from E18 to F18 with (+) in E18 and (-) stripe in F18, then connect R_WOOL (' +
+      woolMode.rVal +
+      ') from H18 to BOT_MINUS_18.';
+
+  return [
+    {
+      step: 1,
+      title: 'Shared Row 2 power filter and dual rail bridges',
+      goal: 'Keep Stage 1 supply filtering intact and power both bottom rails for PINCH, EQ, and VOL.',
+      instructions: [
+        'Keep J_GND_HDR (HDR_GND to TOP_MINUS_1), J_9V_HDR (HDR_9V to C2), R_PWR (100 ohm at A2 to TOP_PLUS_2), and C_PWR (100uF at TOP_PLUS_4 to TOP_MINUS_4, + in TOP_PLUS_4) in place.',
+        'Bridge the ground rails with J_GND_BRIDGE (TOP_MINUS_30 to BOT_MINUS_30) and positive rails with J_PLUS_BRIDGE (TOP_PLUS_29 to BOT_PLUS_29).'
+      ],
+      check: 'Confirm both TOP_PLUS and BOT_PLUS read ~+8.9V relative to BOT_MINUS.'
+    },
+    {
+      step: 2,
+      title: preset.useActivePad
+        ? 'Active bass 47k input pad and 470nF coupling'
+        : 'Passive bass input and 470nF coupling',
+      goal: 'Feed Q1 Base with full 31 Hz sub-bass extension and proper source impedance.',
+      instructions: [
+        step2InputLine,
+        'Install R_PD (1M ohm) from A7 to TOP_MINUS_7 and C1 (470nF box film) from D7 to D9.',
+        'Run J_BASE1 (Cyan Jumper) from E9 to E14 to feed Q1 Base.'
+      ],
+      check: 'Ensure Stage 1 feedback diode D1 has been removed from D14-D16 before powering up.'
+    },
+    {
+      step: 3,
+      title: `First inverter Q1 (${preset.qName}) and PINCH bias gate`,
+      goal: 'Wire the first gain stage and variable base-starvation network.',
+      instructions: [
+        `Seat Q1 (${preset.qName}) with its TO-92 flat face toward you: Emitter at C12, Base at C14, and Collector at C16.`,
+        `Connect J_E1 from A12 to ${pnp ? 'TOP_PLUS_12' : 'TOP_MINUS_12'} and R_C1 (47k ohm) from A16 to ${pnp ? 'TOP_MINUS_16' : 'TOP_PLUS_16'}.`,
+        `Bridge J_PINCH_TAP (Teal Jumper) from D14 to F10, seat PINCH_POT (500kB) at G10/G12/G14, and tie R_PINCH_STOP (15k ohm) from I12 to ${pnp ? 'BOT_PLUS_12' : 'BOT_MINUS_12'}.`
+      ],
+      check: `Probe Q1 Base at B14 for ${preset.voltages[0].val}.`
+    },
+    {
+      step: 4,
+      title: `Direct-coupled Q2 (${preset.qName}), 100k DC feedback, and ${woolMode.label}`,
+      goal: 'Restore 0-degree phase with a second gain stage stabilized by shunt-series DC feedback.',
+      instructions: [
+        `Link J_COUPLE (Amber Jumper) from D16 to D20 and seat Q2 (${preset.qName}, TO-92 flat face toward you) at C18 (E), C20 (B), and C22 (C).`,
+        `Install R_E2 (2.2k ohm) from A18 to ${pnp ? 'TOP_PLUS_18' : 'TOP_MINUS_18'}, R_FB (100k ohm) from D18 back to A14, and R_C2 (4.7k ohm) from A22 to ${pnp ? 'TOP_MINUS_22' : 'TOP_PLUS_22'}.`,
+        cWoolLine
+      ],
+      check: `Probe Q2 Collector at B22 for ${preset.voltages[3].val} as you sweep PINCH.`
+    },
+    {
+      step: 5,
+      title: 'Passive 219 Hz / 1 kHz Tilt EQ and Master Volume',
+      goal: 'Crossfade between low-passed dub sub weight and high-passed synth bite into Master Volume.',
+      instructions: [
+        'Install C2 (220nF film) from D22 to D24; wire the bass leg with R_LP (33k ohm, E24 to F19) and C_LP (22nF film, I19 to BOT_MINUS_19).',
+        'Wire the bite leg with C_HP (4.7nF film, C24 to C26), J_HP (Amber Jumper, E26 to F23), and R_HP (33k ohm, I23 to BOT_MINUS_23).',
+        'Seat EQ_POT (100kB) at G19/G21/G23, link J_EQ_TO_VOL (H21 to F26), seat VOL_POT (100kA) at G26/G28/G30, ground I30 to BOT_MINUS_28 (J_VOL_GND), and run J_OUT from F28 to HDR_OUT.'
+      ],
+      check: 'Sweep EQ from counter-clockwise (deep 219 Hz sub) to clockwise (1 kHz synth snarl).'
+    }
+  ];
+}
+
 function createDSP(sampleRate, getState) {
   const fs2 = sampleRate * 2;
   let hpIn = 0;
@@ -659,6 +746,7 @@ export const stageDescriptor = {
   presets: PRESETS,
   modes: MODES,
   buildComponents,
+  buildWiringSteps,
   audioSpec: {
     defaultRiffId: 'groove',
     hint:

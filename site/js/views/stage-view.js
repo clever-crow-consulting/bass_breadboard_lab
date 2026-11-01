@@ -1,6 +1,7 @@
 import {
   ORDERED_STAGES,
   getStageParts,
+  getStageWiringSteps,
   getDiffAgainstPrevious
 } from '../data/stages/index.js';
 import { getPartPins, traceConnectedNet } from '../breadboard-diff.js';
@@ -216,10 +217,12 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
   let activePresetId = stage.defaultPresetId;
   let activeModeId = stage.defaultModeId;
   let diffEnabled = false;
+  let focusedWiringStep = null;
   let selectedPartId = null;
   let hoveredNet = null;
   let hoverMeta = null;
   let currentParts = [];
+  let currentWiringSteps = [];
   let currentTransition = null;
   let breadboardCleanup = null;
   let disposed = false;
@@ -235,11 +238,18 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
 
   function recomputeCircuitData() {
     currentParts = getStageParts(stage.slug, activePresetId, activeModeId);
+    currentWiringSteps = getStageWiringSteps(stage.slug, activePresetId, activeModeId);
     currentTransition = stage.previousStageSlug
       ? getDiffAgainstPrevious(stage.slug, activePresetId, activeModeId)
       : null;
     if (selectedPartId && !currentParts.some((p) => p.id === selectedPartId)) {
       selectedPartId = null;
+    }
+    if (
+      focusedWiringStep !== null &&
+      !currentWiringSteps.some((step) => step.step === focusedWiringStep)
+    ) {
+      focusedWiringStep = null;
     }
   }
 
@@ -302,6 +312,8 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
       </aside>
     </div>
 
+    <section class="panel wiring-panel" data-region="wiring-checklist" aria-label="Step-by-step breadboard wiring"></section>
+
     <section class="panel studio-panel" data-region="audio-studio" aria-labelledby="studio-heading">
       <div class="studio-header">
         <div>
@@ -340,8 +352,6 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
         </div>
       </div>
     </section>
-
-    <section class="panel wiring-panel" data-region="wiring-checklist" aria-label="Component wiring checklist"></section>
 
     <section class="panel" data-region="theory-notes" aria-labelledby="theory-heading">
       <h2 id="theory-heading" class="section-heading">Circuit design notes</h2>
@@ -482,7 +492,9 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
       <span>${
         diffEnabled && currentTransition
           ? 'Diff active: emerald = added, amber dashed = relocated/swapped, dimmed = unchanged'
-          : 'Click a component to pin it; hover holes A1 to J30 to trace connected 5-hole strips'
+          : focusedWiringStep !== null
+            ? `Build Step ${focusedWiringStep} highlighted on board (other steps dimmed)`
+            : 'Click a component to pin it; hover holes A1 to J30 to trace connected 5-hole strips'
       }</span>`;
 
     breadboardCanvasEl.innerHTML = renderBreadboardSvg({
@@ -492,6 +504,7 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
       highlightedNet: hoveredNet,
       diffResult: currentTransition?.diff || null,
       diffEnabled,
+      focusedStepNumber: focusedWiringStep,
       checkedPartIds: checkedIds,
       theme: state.theme
     });
@@ -539,41 +552,94 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
     }
   }
 
+  function renderPartChecklistItem(part, checkedSet) {
+    const isChecked = checkedSet.has(part.id);
+    const isSelected = selectedPartId === part.id;
+    const pins = getPartPins(part).join(' -> ');
+    return `<div class="wiring-item${isChecked ? ' is-checked' : ''}${isSelected ? ' is-selected' : ''}" data-wiring-row="${escapeHtml(part.id)}">
+      <input type="checkbox" data-action="toggle-part-check" data-part-id="${escapeHtml(part.id)}" aria-label="Mark ${escapeHtml(part.id)} wired"${isChecked ? ' checked' : ''}>
+      <div class="wiring-item-body">
+        <div class="wiring-item-top">
+          <button type="button" class="transition-part-btn" data-action="inspect-part" data-part-id="${escapeHtml(part.id)}">${escapeHtml(part.id)} - ${escapeHtml(part.name || part.type)}</button>
+          <span class="badge">${escapeHtml(part.value || '')}</span>
+        </div>
+        <div class="wiring-item-pins">${escapeHtml(pins)}</div>
+        <div class="wiring-item-role">${escapeHtml(part.role || part.notes || '')}</div>
+      </div>
+    </div>`;
+  }
+
   function renderWiringChecklist() {
     const state = store.getState();
     const rawChecked = getOwnProp(state.stagePartChecks, stage.slug);
     const checkedSet = new Set(Array.isArray(rawChecked) ? rawChecked : []);
     const checkedCount = currentParts.filter((p) => checkedSet.has(p.id)).length;
+    const totalSteps = currentWiringSteps.length;
 
-    const itemsHtml = currentParts
-      .map((part) => {
-        const isChecked = checkedSet.has(part.id);
-        const isSelected = selectedPartId === part.id;
-        const pins = getPartPins(part).join(' -> ');
-        return `<div class="wiring-item${isChecked ? ' is-checked' : ''}${isSelected ? ' is-selected' : ''}" data-wiring-row="${escapeHtml(part.id)}">
-          <input type="checkbox" data-action="toggle-part-check" data-part-id="${escapeHtml(part.id)}" aria-label="Mark ${escapeHtml(part.id)} wired"${isChecked ? ' checked' : ''}>
-          <div class="wiring-item-body">
-            <div class="wiring-item-top">
-              <button type="button" class="transition-part-btn" data-action="inspect-part" data-part-id="${escapeHtml(part.id)}">${escapeHtml(part.id)} - ${escapeHtml(part.name || part.type)}</button>
-              <span class="badge">${escapeHtml(part.value || '')}</span>
-            </div>
-            <div class="wiring-item-pins">${escapeHtml(pins)}</div>
-            <div class="wiring-item-role">${escapeHtml(part.role || part.notes || '')}</div>
-          </div>
-        </div>`;
-      })
-      .join('');
+    const filterBtnsHtml =
+      totalSteps > 0
+        ? `<div class="wiring-step-filter-bar">
+            <span class="variant-label">Highlight build step on board:</span>
+            <button type="button" class="btn btn-toggle btn-sm${focusedWiringStep === null ? ' is-active' : ''}" data-action="focus-wiring-step" data-step="all" aria-pressed="${focusedWiringStep === null}">All steps</button>
+            ${currentWiringSteps
+              .map((step) => {
+                const isFocused = focusedWiringStep === step.step;
+                return `<button type="button" class="btn btn-toggle btn-sm${isFocused ? ' is-active' : ''}" data-action="focus-wiring-step" data-step="${escapeHtml(step.step)}" aria-pressed="${isFocused}">Step ${escapeHtml(step.step)}</button>`;
+              })
+              .join('')}
+          </div>`
+        : '';
+
+    const stepsHtml =
+      totalSteps > 0
+        ? `<div class="wiring-steps-stack">${currentWiringSteps
+            .map((step) => {
+              const stepParts = currentParts.filter((p) => p.stage === step.step);
+              const stepChecked = stepParts.filter((p) => checkedSet.has(p.id)).length;
+              const stepDone = stepParts.length > 0 && stepChecked === stepParts.length;
+              const isFocused = focusedWiringStep === step.step;
+              const instructionsHtml = (step.instructions || [])
+                .map((line) => `<li>${escapeHtml(line)}</li>`)
+                .join('');
+              const partRowsHtml = stepParts
+                .map((part) => renderPartChecklistItem(part, checkedSet))
+                .join('');
+
+              return `<article class="wiring-step-card${isFocused ? ' is-focused' : ''}${stepDone ? ' is-complete' : ''}" data-wiring-step="${escapeHtml(step.step)}">
+                <div class="wiring-step-top">
+                  <div>
+                    <div class="wiring-step-badges">
+                      <span class="badge badge-amber">Step ${escapeHtml(step.step)} of ${escapeHtml(totalSteps)}</span>
+                      <span class="badge ${stepDone ? 'badge-green' : ''}">${stepChecked} of ${stepParts.length} wired</span>
+                    </div>
+                    <h3 class="wiring-step-title">${escapeHtml(step.title)}</h3>
+                    <p class="wiring-step-goal">${escapeHtml(step.goal)}</p>
+                  </div>
+                  <button type="button" class="btn btn-toggle btn-sm${isFocused ? ' is-active' : ''}" data-action="focus-wiring-step" data-step="${escapeHtml(step.step)}" aria-pressed="${isFocused}">${isFocused ? 'Showing on board' : 'Highlight on board'}</button>
+                </div>
+                <ol class="wiring-step-instructions">
+                  ${instructionsHtml}
+                </ol>
+                ${step.check ? `<p class="wiring-step-check"><strong>Bench check:</strong> ${escapeHtml(step.check)}</p>` : ''}
+                <div class="wiring-grid">
+                  ${partRowsHtml}
+                </div>
+              </article>`;
+            })
+            .join('')}</div>`
+        : `<div class="wiring-grid">${currentParts
+            .map((part) => renderPartChecklistItem(part, checkedSet))
+            .join('')}</div>`;
 
     wiringChecklistEl.innerHTML = `<div class="wiring-header">
       <div>
-        <h2 class="section-heading">Component wiring checklist</h2>
-        <p class="section-subtext">${checkedCount} of ${currentParts.length} components checked off for ${escapeHtml(stage.stageNumber)}.</p>
+        <h2 class="section-heading">Step-by-step breadboard wiring</h2>
+        <p class="section-subtext">${checkedCount} of ${currentParts.length} components checked off across ${totalSteps} build steps for ${escapeHtml(stage.stageNumber)}.</p>
       </div>
       <button type="button" class="btn btn-ghost btn-sm" data-action="reset-stage-checks"${checkedCount === 0 ? ' disabled' : ''}>Reset stage checks</button>
     </div>
-    <div class="wiring-grid">
-      ${itemsHtml}
-    </div>`;
+    ${filterBtnsHtml}
+    ${stepsHtml}`;
   }
 
   function syncWiringSelectionHighlight() {
@@ -673,9 +739,33 @@ export function mountStageView(container, { stage, store, audioStudio, router } 
       if (action === 'toggle-diff') {
         if (!stage.previousStageSlug) return;
         diffEnabled = !diffEnabled;
+        if (diffEnabled && focusedWiringStep !== null) {
+          focusedWiringStep = null;
+          renderWiringChecklist();
+        }
         renderVariantControls();
         renderBreadboard({ rebind: false });
         renderTransition();
+        return;
+      }
+
+      if (action === 'focus-wiring-step') {
+        const rawStep = actionEl.getAttribute('data-step');
+        if (rawStep === 'all') {
+          focusedWiringStep = null;
+        } else {
+          const parsed = Number(rawStep);
+          if (Number.isInteger(parsed) && parsed > 0) {
+            focusedWiringStep = focusedWiringStep === parsed ? null : parsed;
+          }
+        }
+        if (focusedWiringStep !== null && diffEnabled) {
+          diffEnabled = false;
+          renderVariantControls();
+          renderTransition();
+        }
+        renderBreadboard({ rebind: false });
+        renderWiringChecklist();
         return;
       }
 

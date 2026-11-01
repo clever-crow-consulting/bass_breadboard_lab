@@ -802,6 +802,77 @@ function buildComponents(presetInput) {
   return parts.map(withPartMeta);
 }
 
+function buildWiringSteps(presetInput) {
+  const preset =
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.oct1_warm;
+
+  const step3FlipFlop2Line =
+    preset.divMode === 'oct2_deep'
+      ? 'Cascade Flip-Flop 1 into Flip-Flop 2 for -2 octaves (f / 4): run J_CLK2 (Cyan Jumper, G15 to C18) and J_DIV2_FB (Cyan Jumper, C17 to C20).'
+      : 'Ground unused Flip-Flop 2 inputs so the CMOS chip stays quiet: install J_CLK2_GND (A18 to TOP_MINUS_18) and J_D2_GND (A20 to TOP_MINUS_20).';
+
+  const step4SubTapLine =
+    preset.divMode === 'oct2_deep'
+      ? 'Tap -2 octave Pin 13 output with R_SUB_FEED (15k ohm) from C16 to C23.'
+      : 'Tap -1 octave Pin 1 output with R_SUB_FEED (15k ohm) from H15 to C23.';
+
+  const step4FilterLine =
+    preset.divMode === 'oct1_synth_sq'
+      ? 'Leave C_SUB_LPF uninstalled so the raw 50%-duty-cycle square wave feeds directly into C_SUB_AC (220nF film, D23 to D25).'
+      : 'Install C_SUB_LPF (47nF film, B21 to B23) for 225 Hz OC-2 sub rounding, then block latched CMOS DC with C_SUB_AC (220nF film, D23 to D25).';
+
+  return [
+    {
+      step: 1,
+      title: 'Supply hum filter and compact Row 4 +4.4V V_REF hub',
+      goal: 'Place the +4.4V virtual ground up at Row 4 so both the TL072 and 14-pin CD4013BE fit comfortably.',
+      instructions: [
+        'Keep J_GND_HDR (HDR_GND to TOP_MINUS_1), J_GND_BRIDGE (TOP_MINUS_30 to BOT_MINUS_30), J_9V_HDR (HDR_9V to C2), R_PWR (100 ohm, A2 to TOP_PLUS_2), and C_PWR (100uF, TOP_PLUS_4 to TOP_MINUS_4).',
+        'Build the Row 4 divider with R_V1 (10k ohm, A4 to TOP_PLUS_5), R_V2 (10k ohm, B4 to TOP_MINUS_5), C_VREF (47uF electrolytic, + in C4, - in TOP_MINUS_3), and J_VREF_LINK (Teal Jumper, E4 to F4).'
+      ],
+      check: 'Meter +4.35V to +4.45V DC at probe point G4.'
+    },
+    {
+      step: 2,
+      title: `2N5088 dry buffer, TL072 ${preset.trkCap} harmonic stripper, and Schmitt clock`,
+      goal: 'Split full-range clean bass from an overtone-free fundamental square clock.',
+      instructions: [
+        'Wire the 750k clean buffer at Rows 5-8: J_IN (HDR_IN to B5), R_PD (1M, A5 to TOP_MINUS_6), C1 (470nF, D5 to D7), R_Q1_BIAS (1M, B7 to D4), Q1 (2N5088 at C6/C7/C8, flat face toward you), J_Q1_C (A8 to TOP_PLUS_8), R_E1 (10k, A6 to TOP_MINUS_7), J_BUF_LINK (E6 to F6), C_DRY_AC (220nF, G6 to G8), and C_TRK_IN (220nF, I6 to I8).',
+        `Seat IC1 (TL072) across E9-E12 and F9-F12 (notch LEFT at Row 9) with J_IC1_VCC (A9 to TOP_PLUS_9), J_IC1_GND (J12 to BOT_MINUS_12), J_PIN3_VREF (I4 to H11), R_TRK_G (4.7k, J8 to I10), R_TRK_FB (150k, G9 to G10), and C_TRK_LP (${preset.trkCap}, H9 to H10).`,
+        'Wire the +/-65 mV Schmitt trigger on Op-Amp B: J_TO_CMP (Teal Jumper, I9 to D11), J_VREF_SPUR (Teal Jumper, H4 to B13), R_HYST_REF (10k, D12 to D13), and R_HYST_FB (470k, C10 to C12).'
+      ],
+      check: 'Probe Clean Buffer at B6 (~+3.75V DC) and Schmitt Out at B10 (snaps cleanly between ~+1.3V and ~+7.5V when playing).'
+    },
+    {
+      step: 3,
+      title: `CD4013BE CMOS divider (${preset.pitchText})`,
+      goal: 'Clock the dual D flip-flop on rising fundamental zero-crossings with all Set/Reset pins grounded.',
+      instructions: [
+        'Seat IC2 (CD4013BE) across E15-E21 and F15-F21 with the Pin 1 notch facing LEFT at Row 15; wire J_IC2_VDD (Red Jumper, A15 to TOP_PLUS_15) and J_IC2_VSS (Black Jumper, J21 to BOT_MINUS_21).',
+        'Ground all four Set/Reset pins: J_R1_GND (I18 to BOT_MINUS_18), J_S1_GND (I20 to BOT_MINUS_20), J_R2_GND (A19 to TOP_MINUS_19), and J_S2_GND (A21 to TOP_MINUS_21).',
+        'Wire Flip-Flop 1 divide-by-2: J_CLK1 (Cyan Jumper, D10 to G17) and J_DIV1_FB (Cyan Jumper, G16 to G19).',
+        step3FlipFlop2Line
+      ],
+      check: 'Probe CD4013 Q1 Out at I15: averages ~+4.35V while playing and latches cleanly at 0V or +8.7V at rest.'
+    },
+    {
+      step: 4,
+      title: `${preset.subFilterText}, Sub/Clean MIX, and Master Volume`,
+      goal: 'Shape the divided sub-octave wave, block latched CMOS DC, and blend with full-range dry bass.',
+      instructions: [
+        step4SubTapLine,
+        step4FilterLine,
+        'Route Sub and Dry into MIX_POT (100kB at C26/C28/C30) via J_SUB_MIX (E25 to B26) and R_DRY_FEED (15k, H8 to B30), then feed VOL_POT (100kA at G26/G28/G30) via J_MIX_TAP (D28 to F22), C_OUT (470nF, H22 to H24), J_VOL_IN (J24 to F26), J_VOL_GND (I30 to BOT_MINUS_28), and J_OUT (F28 to HDR_OUT).'
+      ],
+      check: 'Play single notes above the 5th fret and sweep MIX from 100% Sub (Row 26) to 50/50 octave-doubled bass.'
+    }
+  ];
+}
+
 function createDSP(sampleRate, getState) {
   const fs2 = sampleRate * 2;
   let hpIn = 0;
@@ -909,6 +980,7 @@ export const stageDescriptor = {
   presets: PRESETS,
   modes: MODES,
   buildComponents,
+  buildWiringSteps,
   audioSpec: {
     defaultRiffId: 'upperSynth',
     hint:

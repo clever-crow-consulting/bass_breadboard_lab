@@ -442,6 +442,101 @@ function buildComponents(presetInput, modeInput) {
   return parts.map(withPartMeta);
 }
 
+function buildWiringSteps(presetInput, modeInput) {
+  const preset =
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.npn_mpsa13;
+  const mode =
+    (typeof modeInput === 'string'
+      ? Object.hasOwn(MODES, modeInput)
+        ? MODES[modeInput]
+        : null
+      : modeInput) || MODES.stock;
+
+  const step3Instructions = [
+    `Insert Q1 (${preset.q1Name}) across C12, C14, and C16. ${preset.q1Pinout}`,
+    `Place J_EMIT (${preset.emitRail.startsWith('TOP_PLUS') ? 'Red Jumper' : 'Black Jumper'}) from A12 to ${preset.emitRail} to tie Q1 Emitter to the ${preset.emitRailDesc}.`
+  ];
+  if (preset.needsLeakBleed) {
+    step3Instructions.push(
+      'Install R_LEAK (220k ohm) from A14 to TOP_PLUS_14 so Germanium leakage current bleeds cleanly to filtered +9V.'
+    );
+  }
+
+  let modInstructions;
+  if (mode.id === 'treble_cut') {
+    modInstructions = [
+      'Place C_TONE (10nF box film) from A18 to TOP_MINUS_18 to roll off sharp upper-harmonic fizz.',
+      'Bridge the Mod Zone with J_MOD (Amber Jumper) from D18 to D24 into Volume Lug 3.'
+    ];
+  } else if (mode.id === 'hard_clip') {
+    modInstructions = [
+      'Install R_CLIP (1k ohm) from D18 to D21 and D_CLIP (1N4148, cathode stripe in TOP_MINUS_21) from A21 to TOP_MINUS_21.',
+      'Route the post-clipper node into Volume Lug 3 with J_MOD2 (Amber Jumper) from E21 to D24.'
+    ];
+  } else {
+    modInstructions = [
+      'Bridge the Mod Zone directly with J_MOD (Amber Jumper) from D18 to D24 into Volume Lug 3.'
+    ];
+  }
+
+  return [
+    {
+      step: 1,
+      title: 'Power rails and Row 2 RC hum filter',
+      goal: 'Deliver ripple-free +9V and shared ground across the breadboard rails before inserting audio parts.',
+      instructions: [
+        'Run J_GND_HDR (Black Jumper) from HDR_GND to TOP_MINUS_1 and J_GND_BRIDGE from TOP_MINUS_30 to BOT_MINUS_30.',
+        'Run J_9V_HDR (Red Jumper) from HDR_9V into C2, then bridge R_PWR (100 ohm) from A2 to TOP_PLUS_2.',
+        'Insert C_PWR (100uF electrolytic) with its long (+) lead in TOP_PLUS_4 and stripe (-) lead in TOP_MINUS_4.'
+      ],
+      check: 'Meter ~+8.8V to +9.0V DC between TOP_PLUS_4 and TOP_MINUS_4 before continuing.'
+    },
+    {
+      step: 2,
+      title: 'Passive bass input and 470nF AC coupling',
+      goal: 'Bring your passive pickup onto the board with anti-pop grounding and 3.4 Hz sub-bass coupling.',
+      instructions: [
+        'Connect J_IN (Green Jumper) from HDR_IN to B7 and install R_PD (1M ohm) from A7 to TOP_MINUS_7.',
+        'Span C1 (470nF box film) across D7 to D9 (5mm 2-row pitch).',
+        'Run J_BASE (Cyan Jumper) from E9 to E14 to feed Q1 Base while keeping input away from Row 16 Collector.'
+      ],
+      check: 'Verify Row 7 has 1M continuity to GND and zero DC voltage at rest.'
+    },
+    {
+      step: 3,
+      title: `Transistor Q1 (${preset.q1Name}) placement`,
+      goal: `Seat the gain device across Rows 12, 14, and 16 in ${preset.polarity} orientation.`,
+      instructions: step3Instructions,
+      check: `Confirm Emitter at B12 sits at ${preset.voltages[0].val}.`
+    },
+    {
+      step: 4,
+      title: 'Collector-to-base diode feedback and load resistor',
+      goal: 'Self-bias Q1 one diode drop from turn-on and generate asymmetric bass clipping.',
+      instructions: [
+        `Insert D1 (1N4148 or 3mm Red LED) between D14 and D16: ${preset.d1Dir}.`,
+        `Install R1 (${preset.r1Value}) from A16 to ${preset.r1Rail} (${preset.r1RailDesc}).`
+      ],
+      check: `Probe Collector at B16 for ${preset.voltages[2].val} and Base at B14 for ${preset.voltages[1].val}.`
+    },
+    {
+      step: 5,
+      title: `Output DC block, ${mode.label}, and Master Volume`,
+      goal: 'Strip DC off the clipped signal, wire the Mod Zone option, and connect your 100kA output pot.',
+      instructions: [
+        'Span C2 (470nF box film) from E16 to E18 to block Collector DC.',
+        ...modInstructions,
+        'Seat VOL_POT (100kA) at C24 (Lug 3), C26 (Wiper), and C28 (Lug 1); wire J_VOL_GND from A28 to TOP_MINUS_28 and J_OUT from B26 to HDR_OUT.'
+      ],
+      check: 'Sweep VOL from zero to full: pot rotation should be completely silent with zero DC scratch.'
+    }
+  ];
+}
+
 function createDSP(sampleRate, getState) {
   const fs2 = sampleRate * 2;
   let hpIn = 0;
@@ -527,6 +622,7 @@ export const stageDescriptor = {
   presets: PRESETS,
   modes: MODES,
   buildComponents,
+  buildWiringSteps,
   audioSpec: {
     defaultRiffId: 'groove',
     hint:

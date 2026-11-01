@@ -644,6 +644,80 @@ function buildComponents(presetInput) {
   return parts.map(withPartMeta);
 }
 
+function buildWiringSteps(presetInput) {
+  const preset =
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.biamp_crossover;
+
+  const step3Instructions = preset.phaseTrap
+    ? [
+        'Tie non-inverting Pin 5 to V_REF with J_VREF_PIN5 (Teal Jumper, D10 to D16), and break out Pin 7 (J_FB_OUT, C14 to B17) and Pin 6 (J_FB_IN, D15 to B19).',
+        'Feed buffered bass into inverting Row 19 through R_INV_IN (15k ohm, H13 to E19) and set -3.1x inverted gain with R_DRIVE (47k ohm, A17 to A19).',
+        'Place anti-parallel soft clippers across Rows 17 and 19: D1_LED (3mm Red LED, anode C17, cathode C19) and D2_SI (1N4148, cathode stripe D17, anode D19).'
+      ]
+    : [
+        'Feed non-inverting Pin 5 from clean Pin 1 with J_SPLIT_B (Amber Jumper, H13 to D16), and break out Pin 7 (J_FB_OUT, C14 to B17) and Pin 6 (J_FB_IN, D15 to B19).',
+        'Install R_DRIVE (150k ohm, A17 to A19) in parallel with D1_LED (3mm Red LED, anode C17, cathode C19) and D2_SI (1N4148, cathode stripe D17, anode D19).',
+        'Set the 154 Hz grit high-pass leg with R_G (4.7k ohm, E19 to E21), C_G (220nF film, D21 to D23), and J_CG_VREF (Teal Jumper, D10 to B23).'
+      ];
+
+  const step4CleanLine = preset.biAmpSub
+    ? 'Run R_CLEAN (15k ohm) from J13 to F20 and add C_SUB (47nF film) from I20 to BOT_MINUS_20 to low-pass the clean sub path below 225 Hz.'
+    : 'Run R_CLEAN (15k ohm) from J13 to F20 to carry full-range 0-degree clean bass into BLEND Lug 1.';
+
+  return [
+    {
+      step: 1,
+      title: 'Supply hum filter and Row 10 +4.4V V_REF hub',
+      goal: 'Create a quiet half-supply virtual ground so the TL072 swings symmetrically on a single 9V rail.',
+      instructions: [
+        'Keep J_GND_HDR (HDR_GND to TOP_MINUS_1), J_GND_BRIDGE (TOP_MINUS_30 to BOT_MINUS_30), J_9V_HDR (HDR_9V to C2), R_PWR (100 ohm, A2 to TOP_PLUS_2), and C_PWR (100uF, TOP_PLUS_4 to TOP_MINUS_4).',
+        'Build the 50/50 divider at Row 10 with R_V1 (10k ohm, A10 to TOP_PLUS_10) and R_V2 (10k ohm, B10 to TOP_MINUS_10).',
+        'Stabilize Row 10 with C_VREF (47uF electrolytic, + in C10, - in TOP_MINUS_9) and bridge J_VREF_LINK (Teal Jumper) from E10 to F10.'
+      ],
+      check: 'Meter +4.35V to +4.50V DC at probe point G10 before inserting the TL072.'
+    },
+    {
+      step: 2,
+      title: 'TL072 placement and 1M unity clean buffer (Op-Amp A)',
+      goal: 'Seat the dual JFET op-amp across the center ravine and buffer passive pickups at 1 Megaohm.',
+      instructions: [
+        'Straddle IC1 (TL072) across E13-E16 and F13-F16 with the Pin 1 notch/dot facing LEFT at Row 13; wire J_IC_VCC (A13 to TOP_PLUS_13) and J_IC_GND (J16 to BOT_MINUS_16).',
+        'Bring bass input in via J_IN (HDR_IN to B6), R_PD (1M ohm, A6 to TOP_MINUS_6), C1 (470nF film, D6 to D8), and J_IN_PIN3 (Green Jumper, E8 to H15).',
+        'Bias Pin 3 with R_BIAS (1M ohm, I10 to I15) and close the unity follower loop with J_BUF_FB (Green Jumper, G13 to G14).'
+      ],
+      check: 'Verify Clean Out Pin 1 at I13 idles right at +4.4V DC.'
+    },
+    {
+      step: 3,
+      title: preset.phaseTrap
+        ? 'Op-Amp B 180-degree inverting phase-trap loop'
+        : 'Op-Amp B +30 dB asymmetric soft-clip drive loop',
+      goal: preset.phaseTrap
+        ? 'Configure Op-Amp B in inverting mode to hear 41.2 Hz phase cancellation against the 0-degree dry buffer.'
+        : 'Amplify mids and highs above 154 Hz into asymmetric Red LED + 1N4148 feedback clipping at 0 degrees.',
+      instructions: step3Instructions,
+      check: 'Probe Op-Amp B Output Pin 7 at B14 to confirm +4.35V to +4.50V DC idle bias.'
+    },
+    {
+      step: 4,
+      title: 'Parallel BLEND mixer, DC block, and Master Volume',
+      goal: 'Sum the clean and grit branches across BLEND_POT and strip +4.4V DC ahead of VOL_POT.',
+      instructions: [
+        step4CleanLine,
+        'Run R_WET (15k ohm) from E17 to F24, seat BLEND_POT (100kB) at G20/G22/G24, and route wiper H22 to C24 via J_BLEND_TAP (Amber Jumper).',
+        'Couple through C_OUT (470nF film, D24 to D26) and J_VOL_IN (E26 to F26) into VOL_POT (100kA at G26/G28/G30), with J_VOL_GND (I30 to BOT_MINUS_28) and J_OUT (F28 to HDR_OUT).'
+      ],
+      check: preset.phaseTrap
+        ? 'Set BLEND to 50% noon and pluck open E1: listen for the hollow 41 Hz fundamental drop.'
+        : 'Sweep BLEND from counter-clockwise (clean sub) through noon (bi-amp punch) to clockwise (full drive).'
+    }
+  ];
+}
+
 function createDSP(sampleRate, getState) {
   const fs2 = sampleRate * 2;
   let hpIn = 0;
@@ -731,6 +805,7 @@ export const stageDescriptor = {
   presets: PRESETS,
   modes: MODES,
   buildComponents,
+  buildWiringSteps,
   audioSpec: {
     defaultRiffId: 'groove',
     hint:

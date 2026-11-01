@@ -9,15 +9,15 @@ export const STAGE_ROADMAP = [
     phaseDegrees: 180,
     previousStageSlug: null,
     summary:
-      'Wire the Row 1 to 4 9V RC hum filter, AC-couple your passive bass with 470nF box film capacitors, and self-bias one transistor with a collector-to-base diode.',
+      'Learn how a single transistor amplifies and clips a passive bass signal using collector-to-base diode feedback, and why coupling capacitor values govern sub-bass extension.',
     bassFocus:
-      '470nF input and output capacitors into a 100k load set the high-pass cutoff at 3.4 Hz, keeping 31 Hz low B0 and 41 Hz low E1 fundamentals full while a 3mm red LED increases output headroom.',
+      '470nF coupling into a 100k load sets the high-pass corner at 3.4 Hz, keeping 31 Hz low-B and 41 Hz low-E fundamentals full while a higher-threshold red LED widens output headroom.',
     learnings: [
-      'AC coupling and sub-bass RC high-pass cutoff math',
-      'Collector-to-base diode self-biasing',
-      'Asymmetric clipping waveform geometry',
-      'Passive pickup input loading',
-      'Flipping PNP stages onto standard center-negative 9V power'
+      'RC high-pass cutoff math for preserving sub-bass fundamentals',
+      'Collector-to-base diode self-biasing and DC operating point',
+      'Asymmetric soft-clipping waveform geometry and second-harmonic warmth',
+      'High-impedance passive pickup loading and instrument volume cleanup',
+      'Negative-ground PNP polarity inversion on standard 9V pedal supplies'
     ]
   },
   {
@@ -30,15 +30,15 @@ export const STAGE_ROADMAP = [
     phaseDegrees: 0,
     previousStageSlug: '1',
     summary:
-      'Keep Rows 1 to 16 in place, pull D1, direct-couple Q1 Collector into Q2 Base with 100k DC feedback, and wire PINCH, EQ, and VOLUME pots along the bottom strip.',
+      'Explore how cascading two direct-coupled common-emitter stages multiplies gain into synth-wall square waves, stabilizes DC bias through shunt-series feedback, and gates decaying notes.',
     bassFocus:
-      'Two common-emitter stages invert twice (180 + 180 = 360 degrees) to restore non-inverting 0-degree phase, while PINCH starves Q1 bias for Velcro synth gating.',
+      'Two 180-degree transistor inversions sum to 0-degree phase coherence, while variable base bias starvation narrows waveform duty cycle into tight Velcro synth gating.',
     learnings: [
-      'Two-transistor cascading and non-inverting phase restoration',
-      'DC operating-point stabilization via shunt-series feedback',
-      'Pulse-width bias starvation via PINCH',
-      'Passive low-pass and high-pass tilt EQ',
-      '47k input padding for active bass preamps'
+      'Direct-coupled two-transistor cascading and 0-degree phase restoration',
+      'Thermal bias stabilization through DC shunt-series feedback',
+      'Pulse-width duty-cycle modulation and gated fuzz via bias starvation',
+      'Passive low-pass and high-pass tilt EQ crossfading',
+      'Series source-impedance padding for active onboard bass preamps'
     ]
   },
   {
@@ -51,15 +51,15 @@ export const STAGE_ROADMAP = [
     phaseDegrees: 0,
     previousStageSlug: '2',
     summary:
-      'Straddle a TL072 dual JFET op-amp across the center ravine at Rows 13 to 16, build a +4.5V virtual ground at Row 10, and blend 1M buffered clean lows with +30 dB LED and 1N4148 soft clipping.',
+      'Master single-supply op-amp biasing and parallel signal routing so overdriven upper harmonics never bury the clean low-frequency punch of a passive bass.',
     bassFocus:
-      'Separates clean sub-bass below 225 Hz from harmonic grit above 154 Hz, and includes a switchable 180-degree phase-trap preset that demonstrates 41 Hz cancellation at noon on BLEND.',
+      'Splits clean sub-bass weight below 225 Hz from soft-clipped harmonic grit above 154 Hz, and contrasts in-phase summing against audible 180-degree phase cancellation at 41 Hz.',
     learnings: [
-      'Single-supply +4.5V virtual-ground biasing',
-      'Op-amp negative feedback loops and asymmetric diode clipping',
-      'Parallel clean and dirty mixing without low-end loss',
-      'Bi-amp frequency splitting for sub clarity',
-      'Audible 180-degree phase cancellation on bass fundamentals'
+      'Half-supply +4.5V virtual-ground biasing on a single 9V rail',
+      'Non-inverting op-amp gain loops with asymmetric LED and silicon clipping',
+      'Parallel dry and wet summing for studio bass articulation',
+      'Complementary bi-amp frequency splitting between sub lows and midrange grit',
+      'Recognizing and diagnosing 180-degree phase cancellation in parallel blends'
     ]
   },
   {
@@ -72,14 +72,14 @@ export const STAGE_ROADMAP = [
     phaseDegrees: 0,
     previousStageSlug: '3',
     summary:
-      'Buffer passive pickups at 500k with a 2N5088 emitter follower, cascade unbuffered CD4049UBE CMOS gates for symmetrical tube-like overdrive, and shape tone with an active Gate 3 Baxandall EQ.',
+      'Discover how unbuffered CMOS logic inverters behave as linear push-pull MOSFET tube stages when biased with negative feedback, paired with an active two-band shelving tone stack.',
     bassFocus:
-      'Active 80 Hz Bass and 2.2 kHz Treble shelving bands boost or cut lows and clank independently without scooping midrange fundamentals.',
+      'Symmetrical complementary MOSFET saturation emulates pushed bass amp power tubes, while active 80 Hz Bass and 2.2 kHz Treble shelves boost or cut without scooping midrange.',
     learnings: [
-      'CD4049UBE power pinout (+9V on Pin 1 and GND on Pin 8)',
-      'Why unbuffered UBE inverters work linearly while buffered BE chips oscillate',
-      'Grounding unused CMOS inputs to stop shoot-through current',
-      'Active James/Baxandall two-band shelving tone stack'
+      'High-impedance emitter-follower input buffering for passive pickups',
+      'Linear self-biasing in unbuffered CMOS inverters versus buffered logic oscillation',
+      'Preventing CMOS shoot-through current and parasitic oscillation on unused gates',
+      'Active James/Baxandall two-band feedback shelving tone stack'
     ]
   },
   {
@@ -92,14 +92,14 @@ export const STAGE_ROADMAP = [
     phaseDegrees: 180,
     previousStageSlug: '4',
     summary:
-      'Sleeve a 3mm red LED facing a GL5528 photoresistor inside black heat-shrink tubing, drive the LED from a 1N4148 envelope rectifier, and sweep a resonant Multiple-Feedback band-pass filter.',
+      'Study envelope detection and optoelectronics by turning pluck amplitude into LED brightness to sweep a resonant band-pass filter across vocal funk formants.',
     bassFocus:
-      'Playing harder drives the optical vactrol brighter to sweep vocal funk formants upward while a dedicated Dry Sub MIX knob keeps low fundamentals solid.',
+      'Harder fingerstyle or thumb-slap attacks drive the photoresistor lower in resistance to sweep resonant peaks upward while a parallel dry mix anchors low fundamentals.',
     learnings: [
-      'DIY heat-shrink LED and GL5528 optical vactrol assembly',
-      'Half-wave peak envelope rectification and RC decay constants',
+      'Optoelectronic resistance control using coupled LED and CdS photoresistor cells',
+      'Half-wave peak envelope rectification and RC attack-release time constants',
       'Constant-gain Multiple-Feedback resonant band-pass Q peaking',
-      'Blending resonant band-pass sweeps with clean sub-bass'
+      'Parallel dry sub-bass blending beneath high-Q resonant filter sweeps'
     ]
   },
   {
@@ -112,14 +112,14 @@ export const STAGE_ROADMAP = [
     phaseDegrees: 0,
     previousStageSlug: '5a',
     summary:
-      'Keep Rows 1 to 15 from Stage 5A untouched and move the vactrol LDR leads across the center ravine into Op-Amp A feedback for LA-2A and Diamond style studio bass compression.',
+      'Repurpose the same optical envelope sidechain into a studio feedback gain cell, seeing firsthand how topology turns an auto-wah circuit into smooth dynamic leveling.',
     bassFocus:
-      'Non-inverting feedback gain reduction maintains 0-degree phase coherence and smooths slap transients and uneven string-to-string volume naturally.',
+      'Non-inverting feedback gain reduction maintains 0-degree phase coherence while taming slap spikes and lifting quiet ghost notes with zero low-frequency DC thump.',
     learnings: [
-      'Reusing an optical sidechain across two circuit topologies',
-      'Feedback optical gain reduction math',
-      'Program-dependent GL5528 photoresistor release behavior',
-      'Zero-phase-inversion studio compression for passive bass'
+      'How circuit topology transforms one optical sidechain from filter to compressor',
+      'Feedback versus feedforward optical gain-reduction ratios and knee behavior',
+      'Program-dependent CdS photocell release memory on sustained bass notes',
+      'AC-coupled shunt legs for thump-free single-supply gain reduction'
     ]
   },
   {
@@ -132,14 +132,14 @@ export const STAGE_ROADMAP = [
     phaseDegrees: 0,
     previousStageSlug: '5b',
     summary:
-      'Buffer full-range dry bass with a 2N5088 emitter follower while TL072 Op-Amp A strips upper harmonics and Op-Amp B clocks a CD4013BE CMOS flip-flop for -1 octave (f / 2) and -2 octave (f / 4) sub-bass.',
+      'Bridge analog signal conditioning and digital CMOS logic by extracting the pure fundamental pitch to clock flip-flop frequency dividers one and two octaves below.',
     bassFocus:
-      'Steep 48 Hz to 106 Hz harmonic pre-filtering and Schmitt hysteresis stop octave glitching on decaying bass notes, followed by 225 Hz square-wave smoothing.',
+      'Steep 48 Hz to 106 Hz harmonic pre-filtering and Schmitt trigger hysteresis prevent octave glitching on decaying strings before 225 Hz low-pass filtering rounds square sub-harmonics.',
     learnings: [
-      'Harmonic pre-filtering and Schmitt trigger hysteresis for clean tracking',
-      'CMOS D flip-flop !Q-to-D divide-by-2 and divide-by-4 frequency division',
-      '225 Hz sub-bass square-wave low-pass smoothing',
-      'Blocking latched CMOS DC levels before the output MIX pot'
+      'Overtone stripping and Schmitt trigger hysteresis for glitch-free pitch tracking',
+      'CMOS D flip-flop divide-by-2 (-1 octave) and divide-by-4 (-2 octave) clocking',
+      'Low-pass harmonic shaping from raw square waves into warm synth sub-bass',
+      'AC coupling latched digital CMOS outputs into an analog clean/sub mixer'
     ]
   }
 ];

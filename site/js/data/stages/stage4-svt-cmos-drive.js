@@ -736,6 +736,73 @@ function buildComponents(presetInput) {
   return parts.map(withPartMeta);
 }
 
+function buildWiringSteps(presetInput) {
+  const preset =
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.svt_warm;
+
+  const step3Gate2Lines = preset.bypassGate2
+    ? [
+        'Ground unused Gate 2 input with J_UNUSED_5 (Black Jumper, H14 to BOT_MINUS_14).',
+        'Route Gate 1 Output straight to the EQ input hub via J_TO_EQ (Teal Jumper, I11 to F20) and C_TO_EQ (220nF film, H20 to H18).'
+      ]
+    : [
+        `Couple Gate 1 into Gate 2 with C_INTER (220nF film, I11 to I9), R_IN2 (100k ohm, G9 to H14), and R_FB2 (${preset.rFb2}, G13 to G14).`,
+        'Feed Gate 2 Output into the EQ input hub via J_TO_EQ (Teal Jumper, I13 to F20) and C_TO_EQ (220nF film, H20 to H18).'
+      ];
+
+  return [
+    {
+      step: 1,
+      title: 'CD4049UBE reverse power pins and unused gate grounds',
+      goal: 'Power the 16-pin unbuffered CMOS inverter safely (+9V on Pin 1, GND on Pin 8) and silence unused gates.',
+      instructions: [
+        'Keep J_GND_HDR (HDR_GND to TOP_MINUS_1), J_9V_HDR (HDR_9V to C2), R_PWR (100 ohm, A2 to TOP_PLUS_2), and C_PWR (100uF, TOP_PLUS_4 to TOP_MINUS_4) installed, and bridge both rails with J_GND_BRIDGE (TOP_MINUS_30 to BOT_MINUS_30) and J_PLUS_BRIDGE (TOP_PLUS_29 to BOT_PLUS_29).',
+        'Seat IC1 (CD4049UBE, unbuffered UBE suffix!) across E10-E17 and F10-F17 with the notch facing LEFT at Row 10; wire J_IC_VDD (Red Jumper, J10 to BOT_PLUS_10) for Pin 1 +9V and J_IC_VSS (Black Jumper, J17 to BOT_MINUS_17) for Pin 8 GND.',
+        'Ground all three unused top-side gates: J_UNUSED_14 (A12 to TOP_MINUS_12), J_UNUSED_11 (A15 to TOP_MINUS_15), and J_UNUSED_9 (A17 to TOP_MINUS_17).'
+      ],
+      check: 'Verify +8.7V on F10 (Pin 1) and 0.0V on F17 (Pin 8) before wiring audio.'
+    },
+    {
+      step: 2,
+      title: '500k 2N5088 emitter-follower pickup buffer',
+      goal: 'Present a high-impedance load to passive bass pickups so string snap stays unattenuated.',
+      instructions: [
+        'Run J_IN (Green Jumper, HDR_IN to B5) and C1 (470nF film, D5 to D7), then bias Row 7 with R_B1 (1M ohm, A7 to TOP_PLUS_7) and R_B2 (1M ohm, E7 to TOP_MINUS_6).',
+        'Seat Q1 (2N5088, flat face toward you: E=C6, B=C7, C=C8); tie Collector to +9V via J_Q1_C (A8 to TOP_PLUS_8) and Emitter load R_E1 (10k ohm, A6 to TOP_MINUS_5).'
+      ],
+      check: 'Probe buffered emitter output at B6 for +3.7V to +3.9V DC.'
+    },
+    {
+      step: 3,
+      title: preset.bypassGate2
+        ? 'Single-stage CMOS tube drive (Red Llama mode)'
+        : `Cascaded CMOS tube overdrive (${preset.rFb2} Stage 2)`,
+      goal: 'Self-bias unbuffered MOSFET inverter stages at half-supply for symmetrical tube-like saturation.',
+      instructions: [
+        'Couple Q1 Emitter into Row 4 Top via C_DRV_IN (220nF film, E6 to E4) and feed Gate 1 Input with R_IN1 (33k ohm, D4 to H12) and C_HF1 (100pF ceramic, G11 to G12).',
+        'Wire the Gate 1 feedback loop with J_DRV_OUT (Teal Jumper, H11 to D19), R_DRV_MIN (47k ohm, I12 to D21), and DRIVE_POT (500kB at C19/C21/C23).',
+        ...step3Gate2Lines
+      ],
+      check: 'Probe Gate 1 Output at J11 for self-biased +4.2V to +4.5V DC.'
+    },
+    {
+      step: 4,
+      title: 'Active Gate 3 Baxandall 2-band EQ and Master Volume',
+      goal: 'Wrap Gate 3 in independent 80 Hz Bass and 2.2 kHz Treble feedback shelves ahead of Master Volume.',
+      instructions: [
+        'Wire the 80 Hz Bass shelf: R_BASS_IN (15k, G18 to F19), R_BASS_OUT (15k, F23 to H15), BASS_POT (100kB at G19/G21/G23), C_BASS1 (47nF, I19 to I21), C_BASS2 (47nF, J21 to J23), and R_BASS_SUM (33k, F21 to H16).',
+        'Wire the 2.2 kHz Treble shelf: J_TREB_IN (I18 to B24), J_TREB_FB (G15 to B28), TREB_POT (100kB at C24/C26/C28), J_TREB_TAP (B26 to B22), C_TREB (4.7nF, A22 to A20), and J_TREB_SUM (B20 to G16).',
+        'Route Gate 3 Output through J_EQ_OUT (I15 to F25), C_OUT (470nF, H25 to H27), and J_VOL_IN (J27 to F26) into VOL_POT (100kA at G26/G28/G30) with J_VOL_GND (I30 to BOT_MINUS_28) and J_OUT (F28 to HDR_OUT).'
+      ],
+      check: 'Probe Gate 3 EQ Output at J15 for +4.2V to +4.5V DC; noon on BASS and TREBLE gives flat unity response.'
+    }
+  ];
+}
+
 function createDSP(sampleRate, getState) {
   const fs2 = sampleRate * 2;
   let hpIn = 0;
@@ -835,6 +902,7 @@ export const stageDescriptor = {
   presets: PRESETS,
   modes: MODES,
   buildComponents,
+  buildWiringSteps,
   audioSpec: {
     defaultRiffId: 'groove',
     hint:

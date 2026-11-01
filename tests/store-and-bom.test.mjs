@@ -171,6 +171,30 @@ test('curriculum roadmap and 41-item BOM filter and export cleanly', () => {
       assert.equal(typeof entry[key] === 'string' && entry[key].length > 0, true, `missing ${key} on stage ${entry.slug}`);
     }
     assert.equal(Array.isArray(entry.learnings) && entry.learnings.length >= 4, true);
+
+    const cardCopy = [entry.summary, entry.bassFocus, ...entry.learnings].join(' | ');
+    const forbiddenWiringPatterns = [
+      /\bRows?\s+\d+/i,
+      /\bHoles?\s+[A-J]\d+/i,
+      /\bPin\s+\d+/i,
+      /\bpull\s+D1\b/i,
+      /\bcenter\s+ravine\b/i,
+      /\bbottom\s+strip\b/i,
+      /\btop\s+strip\b/i,
+      /\bheat-shrink\b/i,
+      /\bstraddle\b/i,
+      /\bWire\s+the\b/i,
+      /\b[ACDFGHIJ]\d{1,2}\b/,
+      /\b[BE](?:[2-9]|[12]\d|30)\b/,
+      /[—–]/
+    ];
+    for (const pattern of forbiddenWiringPatterns) {
+      assert.doesNotMatch(
+        cardCopy,
+        pattern,
+        `Stage ${entry.slug} roadmap card should focus on student learning rather than wiring instructions (${pattern}): ${cardCopy}`
+      );
+    }
   }
 
   assert.equal(PASSIVE_PICKUP_PRIMER.length, 4);

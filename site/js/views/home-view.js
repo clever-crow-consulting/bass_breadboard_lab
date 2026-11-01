@@ -81,10 +81,11 @@ export function buildHomeMarkup({ state = createDefaultState(), confirmReset = f
         <p class="stage-card-topology">${escapeHtml(stage.topology)}</p>
         <p class="stage-card-summary">${escapeHtml(stage.summary)}</p>
         <p class="stage-card-focus">${escapeHtml(stage.bassFocus)}</p>
+        <div class="stage-card-learn-heading">What you learn</div>
         <ul class="learning-list">${learningsHtml}</ul>
       </div>
       <div class="stage-card-footer">
-        <span class="mono" style="font-size: 12px; color: var(--text-secondary);">Holes A1 to J30</span>
+        <span class="mono" style="font-size: 12px; color: var(--text-secondary);">Step-by-step wiring + live audio inside</span>
         <a class="btn ${isComplete ? 'btn-ghost' : 'btn-cyan'} btn-sm" href="${escapeHtml(stageHash)}" data-nav-hash="${escapeHtml(stageHash)}">Open ${escapeHtml(stage.stageNumber)}</a>
       </div>
     </article>`;
@@ -125,7 +126,7 @@ export function buildHomeMarkup({ state = createDefaultState(), confirmReset = f
     <section aria-labelledby="roadmap-heading">
       <div style="margin-bottom: 12px;">
         <h2 id="roadmap-heading" class="section-heading">Six-stage breadboard roadmap</h2>
-        <p class="section-subtext">Keep your Row 1 to 4 9V RC hum filter installed across every stage and follow the step-by-step diff checklist as you advance.</p>
+        <p class="section-subtext">Each phase introduces a core analog building block for passive bass. Open any stage for step-by-step breadboard wiring instructions, interactive layout diffs, and live Web Audio auditioning.</p>
       </div>
       <div class="roadmap-grid">
         ${stageCardsHtml}

@@ -573,6 +573,60 @@ function buildComponents(presetInput) {
   return parts.map(withPartMeta);
 }
 
+function buildWiringSteps(presetInput) {
+  const preset =
+    (typeof presetInput === 'string'
+      ? Object.hasOwn(PRESETS, presetInput)
+        ? PRESETS[presetInput]
+        : null
+      : presetInput) || PRESETS.studio_glue;
+
+  return [
+    {
+      step: 1,
+      title: 'Shared Stage 5A supply filter and Row 9 +4.4V V_REF hub',
+      goal: 'Keep the exact Row 1 to 9 power and virtual-ground backbone from Stage 5A in place.',
+      instructions: [
+        'Leave J_GND_HDR (HDR_GND to TOP_MINUS_1), J_GND_BRIDGE (TOP_MINUS_30 to BOT_MINUS_30), J_9V_HDR (HDR_9V to C2), R_PWR (100 ohm, A2 to TOP_PLUS_2), and C_PWR (100uF, TOP_PLUS_4 to TOP_MINUS_4) untouched.',
+        'Keep the Row 9 V_REF divider intact: R_V1 (10k, A9 to TOP_PLUS_9), R_V2 (10k, B9 to TOP_MINUS_9), C_VREF (47uF, + in C9, - in TOP_MINUS_8), and J_VREF_LINK (Teal Jumper, E9 to F9).'
+      ],
+      check: 'Confirm +4.35V to +4.45V DC remains steady at probe point G9.'
+    },
+    {
+      step: 2,
+      title: 'Non-inverting Op-Amp A optical gain cell (0-degree phase)',
+      goal: 'Place the GL5528 photoresistor inside Op-Amp A feedback for thump-free +11.5 dB to +0.6 dB gain control.',
+      instructions: [
+        'Keep IC1 (TL072 at E12-E15 / F12-F15, notch LEFT at Row 12), J_IC_VCC (A12 to TOP_PLUS_12), J_IC_GND (J15 to BOT_MINUS_15), J_IN (HDR_IN to B5), R_PD (1M, A5 to TOP_MINUS_5), C1 (470nF, D5 to D7), J_IN_PIN3 (E7 to H14), and R_BIAS (1M, I9 to I14).',
+        'Extend Op-Amp A feedback below the ravine with J_A_OUT_SPUR (Green Jumper, G12 to F18) and J_A_IN_SPUR (Cyan Jumper, G13 to F20).',
+        'Install R_MAX_GAIN (100k ohm, I18 to I20) in parallel with VAC_LDR (GL5528, G18 to G20), and tie the shunt leg with R_SHUNT_A (33k ohm, H20 to J11) and C_SHUNT_A (220nF film, H11 to H9).'
+      ],
+      check: 'Verify Gain Cell Out at I12 idles at +4.4V DC with zero shift when shading the LDR.'
+    },
+    {
+      step: 3,
+      title: `Op-Amp B feedback sidechain (${preset.relCap} / ${preset.rLed}) and ravine vactrol`,
+      goal: `Tap the compressed output to drive the Red LED across the ravine (${preset.ratioText}, ${preset.releaseText}).`,
+      instructions: [
+        'Tap compressed Pin 1 into Op-Amp B with J_SIDE_IN (Red Jumper, H12 to D15), R_SIDE_FB (150k ohm, C13 to C14), R_COMP_MIN (4.7k ohm, B14 to B21), COMP_POT (100kB at C19/C21/C23), C_SIDE_DC (220nF, D19 to D17), and J_SIDE_VREF (Teal Jumper, A17 to D9).',
+        `Rectify and smooth peaks with D_RECT (1N4148, anode D13, cathode stripe E16), C_REL (${preset.relCap}, + lead in B16, - lead in B20), and R_LED (${preset.rLed}, C16 to C18).`,
+        'Insert VAC_LED (3mm Red LED, long + anode in E18, short - cathode in E20) bent south across the center ravine against VAC_LDR inside black heat-shrink, and return Row 20 Top to V_REF via J_LED_VREF (Teal Jumper, A20 to J9).'
+      ],
+      check: 'Probe Release Cap at B16: DC rises from +4.4V toward +7.0V on plucks as the vactrol LED illuminates.'
+    },
+    {
+      step: 4,
+      title: 'Compressed audio coupling and Makeup LEVEL pot',
+      goal: 'Block +4.4V DC and match compressed loudness against bypassed unity.',
+      instructions: [
+        'Route compressed audio from Row 18 Bottom via J_AUDIO_TAP (Amber Jumper, H18 to F23) into C_OUT (470nF film, H23 to H25).',
+        'Connect J_VOL_IN (Amber Jumper, J25 to F26) into VOL_POT / LEVEL (100kA at G26/G28/G30), ground I30 to BOT_MINUS_28 (J_VOL_GND), and run J_OUT from F28 to HDR_OUT.'
+      ],
+      check: 'Play thumb slaps and quiet ghost notes while sweeping COMP to hear smooth optical leveling.'
+    }
+  ];
+}
+
 function createDSP(sampleRate, getState) {
   const fs2 = sampleRate * 2;
   let hpIn = 0;
@@ -660,6 +714,7 @@ export const stageDescriptor = {
   presets: PRESETS,
   modes: MODES,
   buildComponents,
+  buildWiringSteps,
   audioSpec: {
     defaultRiffId: 'slap',
     hint:

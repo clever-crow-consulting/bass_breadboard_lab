@@ -6,10 +6,12 @@ import {
   getStage,
   getStageParts,
   getStageDefaultParts,
+  getStageWiringSteps,
   getDiffAgainstPrevious
 } from '../site/js/data/stages/index.js';
 import {
   validateStageParts,
+  getPartPins,
   traceConnectedNet,
   computeBreadboardDiff
 } from '../site/js/breadboard-diff.js';
@@ -144,4 +146,102 @@ test('stage-to-stage transition diffs preserve shared power and Stage 5A->5B Row
     true,
     'Stage 5A->5B must relocate VAC_LDR into Op-Amp A feedback'
   );
+});
+
+test('all 7 stages provide preset- and mode-aware step-by-step wiring instructions aligned with part.stage', () => {
+  assert.deepEqual(getStageWiringSteps('unknown'), []);
+  assert.deepEqual(
+    getStageWiringSteps('1', 'toString', 'valueOf'),
+    getStageWiringSteps('1', 'npn_mpsa13', 'stock')
+  );
+
+  for (const stage of ORDERED_STAGES) {
+    assert.equal(
+      typeof stage.buildWiringSteps,
+      'function',
+      `Stage ${stage.slug} must define buildWiringSteps(preset, mode)`
+    );
+    for (const preset of Object.values(stage.presets)) {
+      for (const mode of Object.values(stage.modes)) {
+        const parts = getStageParts(stage.slug, preset.id, mode.id);
+        const steps = getStageWiringSteps(stage.slug, preset.id, mode.id);
+        assert.equal(
+          Array.isArray(steps) && steps.length >= 4,
+          true,
+          `Stage ${stage.slug} (${preset.id}/${mode.id}) must return >= 4 wiring steps`
+        );
+
+        const stepNums = steps.map((s) => s.step);
+        const expectedNums = Array.from({ length: steps.length }, (_, idx) => idx + 1);
+        assert.deepEqual(
+          stepNums,
+          expectedNums,
+          `Stage ${stage.slug} (${preset.id}/${mode.id}) wiring steps must be numbered 1..N`
+        );
+
+        const partStages = [...new Set(parts.map((p) => p.stage))].sort((a, b) => a - b);
+        assert.deepEqual(
+          partStages,
+          expectedNums,
+          `Stage ${stage.slug} (${preset.id}/${mode.id}) part.stage values must match wiring step numbers`
+        );
+
+        for (const step of steps) {
+          assert.equal(typeof step.title === 'string' && step.title.length > 0, true);
+          assert.equal(typeof step.goal === 'string' && step.goal.length > 0, true);
+          assert.equal(
+            Array.isArray(step.instructions) && step.instructions.length >= 2,
+            true,
+            `Stage ${stage.slug} Step ${step.step} must provide >= 2 concrete wiring bullets`
+          );
+          const combined = [step.title, step.goal, step.check || '', ...step.instructions].join(' ');
+          assert.doesNotMatch(combined, /[—–]/, `Stage ${stage.slug} Step ${step.step} contains forbidden em/en dash`);
+
+          const stepParts = parts.filter((p) => p.stage === step.step);
+          const stepPartIds = new Set(stepParts.map((p) => p.id));
+          const stepPins = new Set(stepParts.flatMap((p) => getPartPins(p)));
+          const instructionsText = step.instructions.join(' ');
+          for (const part of stepParts) {
+            assert.equal(
+              instructionsText.includes(part.id),
+              true,
+              `Stage ${stage.slug} (${preset.id}/${mode.id}) Step ${step.step} must explicitly reference part ${part.id}`
+            );
+          }
+          const pinTokenRe = /\b(?:HDR_(?:IN|OUT|9V|GND)|(?:TOP|BOT)_(?:PLUS|MINUS)_\d{1,2}|[A-J](?:[1-9]|[12]\d|30))\b/g;
+          for (const match of instructionsText.matchAll(pinTokenRe)) {
+            const tok = match[0];
+            if (stepPartIds.has(tok)) continue;
+            assert.equal(
+              stepPins.has(tok),
+              true,
+              `Stage ${stage.slug} (${preset.id}/${mode.id}) Step ${step.step} mentions coordinate ${tok} not belonging to Step ${step.step} parts`
+            );
+          }
+        }
+      }
+    }
+  }
+
+  const s1NpnSteps = getStageWiringSteps('1', 'npn_mpsa13', 'stock');
+  const s1GeClipSteps = getStageWiringSteps('1', 'pnp_ac128', 'hard_clip');
+  assert.match(s1NpnSteps[2].instructions.join(' '), /TOP_MINUS_12/);
+  assert.match(s1GeClipSteps[2].instructions.join(' '), /R_LEAK/);
+  assert.match(s1GeClipSteps[3].instructions.join(' '), /D16/);
+  assert.match(s1GeClipSteps[4].instructions.join(' '), /D_CLIP/);
+
+  const s2ActiveTamed = getStageWiringSteps('2', 'npn_active', 'tamed_wool');
+  assert.match(s2ActiveTamed[1].instructions.join(' '), /R_PAD/);
+  assert.match(s2ActiveTamed[3].instructions.join(' '), /1k ohm/);
+
+  const s3PhaseTrap = getStageWiringSteps('3', 'phase_trap', 'standard');
+  assert.match(s3PhaseTrap[2].instructions.join(' '), /J_VREF_PIN5|R_INV_IN/);
+
+  const s4RedLlama = getStageWiringSteps('4', 'red_llama_raw', 'standard');
+  assert.match(s4RedLlama[2].instructions.join(' '), /J_UNUSED_5|H14/);
+
+  const s6Oct2 = getStageWiringSteps('6', 'oct2_deep', 'standard');
+  const s6RawSq = getStageWiringSteps('6', 'oct1_synth_sq', 'standard');
+  assert.match(s6Oct2[2].instructions.join(' '), /J_CLK2/);
+  assert.doesNotMatch(s6RawSq[3].instructions.join(' '), /B21.*B23/);
 });
